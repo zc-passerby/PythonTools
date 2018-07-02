@@ -93,19 +93,32 @@ class ObjSqliteConnector(object):
                 bRet, Reason = self._executeSqlFormat(insertSql, values[0])
             else:
                 bRet, Reason = self._executeMany(insertSql, values)
-            return bRet, Reason
         except:
-            return (False, traceback.format_exc())
+            bRet, Reason = False, traceback.format_exc()
+        finally:
+            return (bRet, Reason)
 
-    def query(self, tableName, columns = None, whereClause = None):
-        selectSql = 'SELECT {0} from {1} {2};'
-        columnStr = '*'
-        if columns != None and columns != "*":
-            columnStr = "`" + "`,`".join(columns) + "`"
-        whereClauseStr = ''
-        if whereClause is not None:
-            whereClauseStr = "where " + whereClause
-        return self._querySql(selectSql.format(columnStr, tableName, whereClauseStr))
+    def select(self, tableName, columns = '*', whereClause = '', whereValue = ''):
+        try:
+            bRet, Reason = False, 'System Error'
+            if columns == '' : columns = '*'
+            valueCount = 0
+            if whereClause != '':
+                valueCount = len(whereValue)
+                clauseCount = whereClaus.count('?');
+                if valueCount != clauseCount and type(whereValue) != tuple:
+                    return (False, 'whereData not fit whereClaus')
+            selectSqlFormat = "select {0} from {1}"
+            if valueCount != 0:
+                selectSql = selectSqlFormat.format(columns, tableName) + ' where ' + whereClaus + ';'
+                bRet, Reason = self._querySqlFormat(selectSql, whereValue)
+            else:
+                selectSql = selectSqlFormat.format(columns, tableName) + ';'
+                bRet, Reason = self._querySql(selectSql);
+        except:
+            bRet, Reason = False, traceback.format_exc()
+        finally:
+            return (bRet, Reason)
 
     def queryGetId(self, tableName, columns = None, whereClause = None):
         retInt = self.query(tableName, columns, whereClause)
