@@ -5,6 +5,9 @@ import sys, requests, time
 import urllib, urllib2, re
 from bs4 import BeautifulSoup
 
+import pokeNounsDefine
+RegionDefine = pokeNounsDefine.RegionDefine
+
 websiteBase = "http://wiki.52poke.com"
 websiteHome = "http://wiki.52poke.com/wiki/%E5%AE%9D%E5%8F%AF%E6%A2%A6%E5%88%97%E8%A1%A8%EF%BC%88%E6%8C%89%E5%85%A8%E5%9B%BD%E5%9B%BE%E9%89%B4%E7%BC%96%E5%8F%B7%EF%BC%89"
 
@@ -54,8 +57,7 @@ def parsePokemonPageMulti(soup):
     if i != 0 : bRet = True
     return bRet
 
-def parsePokemonPage(pokemonPage):
-    soup = BeautifulSoup(pokemonPage.text, 'lxml')
+def getPokemonName(soup):
     pokemonNameList = soup.select('.textblack.bgwhite > span > b')
     pokemonNameList += soup.select('.textblack.bgwhite > b')
     if len(pokemonNameList) < 3: return
@@ -82,13 +84,37 @@ def parsePokemonPage(pokemonPage):
     #print pokemonClass
     print sqlFormat.format(_id = pokemonId.encode('utf-8'), zh = name_zh.encode('utf-8'), en = name_en.encode('utf-8'), jp = name_jp.encode('utf-8'), attr = attributes.encode('utf-8'), cls = pokemonClass.encode('utf-8'))
 
-def getPokemonSn(soup): # get serial number
-    tdList = soup.select('.textblack.bw-1.fulltable > tr > td > .roundy.bgwhite.fulltable.textblack > tr')
-    for t in tdList:
-        if t.has_attr('class') and t['class'][0] == 'hide':
+def getPokemonSn(pokemonInfoTag):
+    snDict = {}
+    NationalSn = pokemonInfoTag.select('.textblack.bgwhite > a')[0].text.lstrip('#').encode('utf8')
+    snDict['National'] = NationalSn
+    trList = pokemonInfoTag.select('.textblack.bw-1.fulltable > tr > td > .roundy.bgwhite.fulltable.textblack > tr')
+    for tr in trList:
+        if tr.has_attr('class') and tr['class'][0] == 'hide':
             continue
         print '============================'
-        print t
+        tdList = tr.select('td')
+        tdLen = len(tdList)
+        if tdLen <= 1: continue
+        region = tdList[0].text.strip()
+        # if tdLen == 2:
+        #     snDict[RegionDefine[region]] = tdList[1].text.strip().encode('utf8')
+        # else:
+        #     snDict[RegionDefine[region]] = tdList[1].text.strip().encode('utf8') + '/' + tdList[2].text.strip().encode('utf8')
+        for i, td in enumerate(tdList):
+            if i == 0: continue
+            if 'hide' in td['class']: continue
+            if snDict.get(RegionDefine[region], None):
+                snDict[RegionDefine[region]] = snDict[RegionDefine[region]] + '/' + td.text.strip().encode('utf8')
+            else:
+                snDict[RegionDefine[region]] = td.text.strip().encode('utf8')
+    return snDict
+
+def parsePokemonPage(pokemonPage):
+    soup = BeautifulSoup(pokemonPage.text, 'lxml')
+    pokemonInfoTagList = soup.select('#bodyContent > #mw-content-text > .mw-parser-output > .roundy.a-r.at-c')
+    pokemonInfoTag = pokemonInfoTagList[0]
+    dPokeSn = getPokemonSn(pokemonInfoTag)
 
 def getPokemonInfo(indexPage):
     soup = BeautifulSoup(indexPage.text, 'lxml')
@@ -101,9 +127,7 @@ def getPokemonInfo(indexPage):
         pokemonUrl = websiteBase + pokemon['href']
         #print pokemonUrl
         pokemonPage = requests.get(pokemonUrl)
-        pokemonPageSoup = BeautifulSoup(pokemonPage.text, 'lxml')
-        getPokemonSn(pokemonPageSoup)
-        #parsePokemonPage(pokemonPage)
+        parsePokemonPage(pokemonPage)
         break
         #if i >= 100 : break
 
