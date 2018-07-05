@@ -5,9 +5,6 @@ import sys, requests, time
 import urllib, urllib2, re
 from bs4 import BeautifulSoup
 
-import pokeNounsDefine
-RegionDefine = pokeNounsDefine.RegionDefine
-
 websiteBase = "http://wiki.52poke.com"
 websiteHome = "http://wiki.52poke.com/wiki/%E5%AE%9D%E5%8F%AF%E6%A2%A6%E5%88%97%E8%A1%A8%EF%BC%88%E6%8C%89%E5%85%A8%E5%9B%BD%E5%9B%BE%E9%89%B4%E7%BC%96%E5%8F%B7%EF%BC%89"
 
@@ -63,8 +60,8 @@ def getPokemonName(soup):
     if len(pokemonNameList) < 3: return
     pokemonId = soup.select('.textblack.bgwhite > a')[0].text.lstrip('#').lstrip('0')
     if parsePokemonPageMulti(soup) == True : return
-    #print '----------------------------------------------------------'
-    #print pokemonId
+    print '----------------------------------------------------------'
+    print pokemonId
     name_zh = pokemonNameList[0].text
     name_jp = pokemonNameList[1].text
     name_en = pokemonNameList[2].text
@@ -92,29 +89,34 @@ def getPokemonSn(pokemonInfoTag):
     for tr in trList:
         if tr.has_attr('class') and tr['class'][0] == 'hide':
             continue
-        print '============================'
         tdList = tr.select('td')
         tdLen = len(tdList)
         if tdLen <= 1: continue
-        region = tdList[0].text.strip()
-        # if tdLen == 2:
-        #     snDict[RegionDefine[region]] = tdList[1].text.strip().encode('utf8')
-        # else:
-        #     snDict[RegionDefine[region]] = tdList[1].text.strip().encode('utf8') + '/' + tdList[2].text.strip().encode('utf8')
+        region = tdList[0].text.strip().encode('utf8')
         for i, td in enumerate(tdList):
             if i == 0: continue
             if 'hide' in td['class']: continue
-            if snDict.get(RegionDefine[region], None):
-                snDict[RegionDefine[region]] = snDict[RegionDefine[region]] + '/' + td.text.strip().encode('utf8')
+            if snDict.get(region, None):
+                snDict[region] = snDict[region] + '/' + td.text.strip().encode('utf8')
             else:
-                snDict[RegionDefine[region]] = td.text.strip().encode('utf8')
+                snDict[region] = td.text.strip().encode('utf8')
     return snDict
+
+def getPokemonName1(pokemonInfoTag):
+    pass
 
 def parsePokemonPage(pokemonPage):
     soup = BeautifulSoup(pokemonPage.text, 'lxml')
     pokemonInfoTagList = soup.select('#bodyContent > #mw-content-text > .mw-parser-output > .roundy.a-r.at-c')
     pokemonInfoTag = pokemonInfoTagList[0]
+    attrTag = pokemonInfoTag.select('tr > th > a > span.textblack') #区分是宝可梦页面还是属性页面
+    if len(attrTag) and attrTag[0].text == u'属性列表':
+        print '这是属性。。。。'
+        return
+
     dPokeSn = getPokemonSn(pokemonInfoTag)
+    for k, v in dPokeSn.iteritems():
+        print k, v
 
 def getPokemonInfo(indexPage):
     soup = BeautifulSoup(indexPage.text, 'lxml')
@@ -125,11 +127,11 @@ def getPokemonInfo(indexPage):
         i += 1
         #print pokemon
         pokemonUrl = websiteBase + pokemon['href']
-        #print pokemonUrl
+        print pokemonUrl
         pokemonPage = requests.get(pokemonUrl)
         parsePokemonPage(pokemonPage)
-        break
-        #if i >= 100 : break
+        sys.stdout.flush()
+        #if i >= 4 : break
 
 indexPage = requests.get(websiteHome)
 getPokemonInfo(indexPage)
