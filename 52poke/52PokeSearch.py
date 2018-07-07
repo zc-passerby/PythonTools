@@ -84,7 +84,7 @@ def getPokemonName(soup):
 def getPokemonSn(pokemonInfoTag):
     snDict = {}
     NationalSn = pokemonInfoTag.select('.textblack.bgwhite > a')[0].text.lstrip('#').encode('utf8')
-    snDict['National'] = NationalSn
+    snDict['全国'] = NationalSn
     trList = pokemonInfoTag.select('.textblack.bw-1.fulltable > tr > td > .roundy.bgwhite.fulltable.textblack > tr')
     for tr in trList:
         if tr.has_attr('class') and tr['class'][0] == 'hide':
@@ -105,7 +105,15 @@ def getPokemonSn(pokemonInfoTag):
 def getPokemonName1(pokemonInfoTag):
     pass
 
-def parsePokemonPage(pokemonPage):
+def parsePokemonPage(pokemonInfoTag):
+    dPokeSn = getPokemonSn(pokemonInfoTag)
+    for k, v in dPokeSn.iteritems():
+        print k, v
+
+def checkPokemonPageMulti():
+    pass
+
+def checkPokemonPage(pokemonPage):
     soup = BeautifulSoup(pokemonPage.text, 'lxml')
     pokemonInfoTagList = soup.select('#bodyContent > #mw-content-text > .mw-parser-output > .roundy.a-r.at-c')
     pokemonInfoTag = pokemonInfoTagList[0]
@@ -113,10 +121,7 @@ def parsePokemonPage(pokemonPage):
     if len(attrTag) and attrTag[0].text == u'属性列表':
         print '这是属性。。。。'
         return
-
-    dPokeSn = getPokemonSn(pokemonInfoTag)
-    for k, v in dPokeSn.iteritems():
-        print k, v
+    parsePokemonPage(pokemonInfoTag) # 解析宝可梦详情页
 
 def getPokemonInfo(indexPage):
     soup = BeautifulSoup(indexPage.text, 'lxml')
@@ -129,7 +134,7 @@ def getPokemonInfo(indexPage):
         pokemonUrl = websiteBase + pokemon['href']
         print pokemonUrl
         pokemonPage = requests.get(pokemonUrl)
-        parsePokemonPage(pokemonPage)
+        checkPokemonPage(pokemonPage)
         sys.stdout.flush()
         #if i >= 4 : break
 
