@@ -8,84 +8,11 @@ from bs4 import BeautifulSoup
 websiteBase = "http://wiki.52poke.com"
 websiteHome = "http://wiki.52poke.com/wiki/%E5%AE%9D%E5%8F%AF%E6%A2%A6%E5%88%97%E8%A1%A8%EF%BC%88%E6%8C%89%E5%85%A8%E5%9B%BD%E5%9B%BE%E9%89%B4%E7%BC%96%E5%8F%B7%EF%BC%89"
 
-sqlFormat = "INSERT INTO `pokemonDefine` (`id`, `name_zh`, `name_en`, `name_jp`, `attributes`, `class`) VALUES ('{_id}', '{zh}', '{en}', '{jp}', '{attr}', '{cls}');"
-
-def parseTargetPokemon(pokemonName, soup, position):
-    bRet = True
-    try:
-        #print 'tr._toggle.form' + str(position)
-        targetPokemon = soup.select('tr._toggle.form' + str(position))[0]
-        pokemonNameL = targetPokemon.select('.textblack.bgwhite > span > b')
-        pokemonNameL += targetPokemon.select('.textblack.bgwhite > b')
-        #print pokemonNameL
-        if len(pokemonNameL) < 3: return False
-        pokemonId = soup.select('.textblack.bgwhite > a')[0].text.lstrip('#').lstrip('0')
-        name_zh = pokemonNameL[0].text + u'-' + pokemonName
-        name_jp = pokemonNameL[1].text
-        name_en = pokemonNameL[2].text
-        #print '----------------------------------------------------------'
-        #print pokemonId
-        #print name_zh, name_jp, name_en
-        pokemonAttrL = targetPokemon.select('.bgwhite.fulltable > tr > .roundy > span > a')
-        attributes = ""
-        for atag in pokemonAttrL:
-            if attributes != "":
-                attributes += "|"
-            attributes += atag.text.strip()
-        #print attributes
-        pokemonClassL = targetPokemon.select('table.roundy.bgwhite.fulltable > tr > td.roundy.bgwhite.bw-1')
-        pokemonClass = pokemonClassL[0].text.strip()
-        #print pokemonClass
-        print sqlFormat.format(_id = pokemonId.encode('utf-8'), zh = name_zh.encode('utf-8'), en = name_en.encode('utf-8'), jp = name_jp.encode('utf-8'), attr = attributes.encode('utf-8'), cls = pokemonClass.encode('utf-8'))
-    except:
-        bRet = False
-    return bRet
-
-def parsePokemonPageMulti(soup):
-    bRet = False
-    sightL = soup.select('div.mw-parser-output > table.roundy.at-c.a-r > tr > th')
-    i = 0
-    for sight in sightL:
-        text = sight.text.strip('\n')
-        if text and text != u'形态':
-            #print text
-            i += 1
-            if parseTargetPokemon(text, soup, i) == False : i = 0
-    if i != 0 : bRet = True
-    return bRet
-
-def getPokemonName(soup):
-    pokemonNameList = soup.select('.textblack.bgwhite > span > b')
-    pokemonNameList += soup.select('.textblack.bgwhite > b')
-    if len(pokemonNameList) < 3: return
-    pokemonId = soup.select('.textblack.bgwhite > a')[0].text.lstrip('#').lstrip('0')
-    if parsePokemonPageMulti(soup) == True : return
-    print '----------------------------------------------------------'
-    print pokemonId
-    name_zh = pokemonNameList[0].text
-    name_jp = pokemonNameList[1].text
-    name_en = pokemonNameList[2].text
-    #print name_zh, name_jp, name_en
-    #pokemonImg = soup.select('.roundy > tr > td > div > a > img')
-    #imgUrl = pokemonImg[0]['data-url'].strip('/')
-    #print imgUrl
-    pokemonAttrL = soup.select('.bgwhite.fulltable > tr > .roundy > span > a')
-    attributes = ""
-    for atag in pokemonAttrL:
-        if attributes != "":
-            attributes += "|"
-        attributes += atag.text.strip()
-    #print attributes
-    pokemonClassL = soup.select('table.roundy.bgwhite.fulltable > tr > td.roundy.bgwhite.bw-1')
-    pokemonClass = pokemonClassL[0].text.strip()
-    #print pokemonClass
-    print sqlFormat.format(_id = pokemonId.encode('utf-8'), zh = name_zh.encode('utf-8'), en = name_en.encode('utf-8'), jp = name_jp.encode('utf-8'), attr = attributes.encode('utf-8'), cls = pokemonClass.encode('utf-8'))
-
-def getPokemonSn(pokemonInfoTag):
+def getPokemonSn(soup, pokemonInfoTag):# 获取宝可梦图鉴编号，包含全国图鉴和各地区图鉴
     snDict = {}
-    NationalSn = pokemonInfoTag.select('.textblack.bgwhite > a')[0].text.lstrip('#').encode('utf8')
+    NationalSn = soup.select('.textblack.bgwhite > a')[0].text.lstrip('#').encode('utf8')
     snDict['全国'] = NationalSn
-    trList = pokemonInfoTag.select('.textblack.bw-1.fulltable > tr > td > .roundy.bgwhite.fulltable.textblack > tr')
+    trList = pokemonInfoTag.select('.roundy.bgwhite.fulltable.textblack > tr')
     for tr in trList:
         if tr.has_attr('class') and tr['class'][0] == 'hide':
             continue
@@ -102,26 +29,85 @@ def getPokemonSn(pokemonInfoTag):
                 snDict[region] = td.text.strip().encode('utf8')
     return snDict
 
-def getPokemonName1(pokemonInfoTag):
-    pass
+def getPokemonName(pokemonInfoTag, sightName):# 获取宝可梦名字，包含中文名、日文名、英文名，其中有多形态的，中文名以：宝可梦原名-宝可梦形态名展示
+    if sightName: sightName = u'-' + sightName
+    pokemonNameList = pokemonInfoTag.select('.textblack.bgwhite > span > b')
+    pokemonNameList += pokemonInfoTag.select('.textblack.bgwhite > b')
+    if len(pokemonNameList) < 3: return ('unknown', 'unknown', 'unknown')
+    name_zh = pokemonNameList[0].text + sightName
+    name_jp = pokemonNameList[1].text
+    name_en = pokemonNameList[2].text
+    return (name_zh.encode('utf8'), name_jp.encode('utf8'), name_en.encode('utf8'))
 
-def parsePokemonPage(pokemonInfoTag):
-    dPokeSn = getPokemonSn(pokemonInfoTag)
-    for k, v in dPokeSn.iteritems():
-        print k, v
+def getPokemonAttr(pokemonInfoTag):# 获取宝可梦属性，多个属性以丨间隔， 属性：一般、火、虫、水、毒、电、飞行、草、地面、冰、格斗、超能力、岩石、幽灵、龙、恶、钢、妖精
+    pokemonAttrL = pokemonInfoTag.select('.bgwhite.fulltable > tr > .roundy > span > a')
+    attributes = ""
+    for atag in pokemonAttrL:
+        if attributes != "":
+            attributes += "|"
+        attributes += atag.text.strip()
+    return attributes.encode('utf8')
 
-def checkPokemonPageMulti():
-    pass
+def getPokemonClass(pokemonInfoTag):# 获取宝可梦分类
+    pokemonClassL = pokemonInfoTag.select('table.roundy.bgwhite.fulltable > tr > td.roundy.bgwhite.bw-1')
+    pokemonClass = pokemonClassL[0].text.strip()
+    return pokemonClass.encode('utf8')
+
+def getPokemonFeatures(pokemonInfoTag):# 获取宝可梦特性，普通特性和隐藏特性
+    pokemonFeatureL = pokemonInfoTag.select('.roundy.bgwhite.fulltable > td')
+    for featureTag in pokemonFeatureL:
+        print featureTag.text.encode('utf8')
+
+# 注：jarTagL为获取宝可梦信息的容器，包括：
+# 属性、分类、特性、100级时经验值、地区图鉴编号、[地区浏览器编号]
+# 身高、体重、体形、脚印、图鉴颜色、捕获率、性别比例、培育、取得基础点数、旁支系列
+def parsePokemonPage(soup, pokemonInfoTag, sightName = ''):# 解析宝可梦详情页
+    print '*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-'
+    tPokemonName = getPokemonName(pokemonInfoTag, sightName)
+    #print tPokemonName[0], tPokemonName[1], tPokemonName[2]
+    dPokeSn, sPokeAttr, sPokeClass = '', '', ''
+    jarTagL = pokemonInfoTag.select('table.roundy.bw-1.fulltable > tr > td')
+    for jarTag in jarTagL:
+        if not jarTag.b: continue
+        bTagText = jarTag.b.text
+        if bTagText == u'地区图鉴编号':
+            dPokeSn = getPokemonSn(pokemonInfoTag, jarTag)
+            #for k, v in dPokeSn.iteritems():
+            #    print k, v
+        if bTagText == u'属性':
+            sPokeAttr = getPokemonAttr(jarTag)
+            #print sPokeAttr
+        if bTagText == u'分类':
+            sPokeClass = getPokemonClass(jarTag)
+            #print sPokeClass
+        if bTagText == u'特性':
+            print "~~~~~"
+            getPokemonFeatures(jarTag)
+
+def checkPokemonPageMulti(pokemonInfoTag, soup):# 去除属性页，解析多形态宝可梦页面
+    bRet = False
+    #attrTag = pokemonInfoTag.select('tr > th > a > span.textblack') #区分是宝可梦页面还是属性页面
+    attrTag = pokemonInfoTag.select('tr > th')
+    if attrTag[0].a.text == u'属性列表':
+        #print '这是属性。。。。'
+        bRet = True
+    elif attrTag[0].a.text == u'形态':
+        sightPosition = 0
+        for sight in attrTag:
+            sightText = sight.text.strip('\n')
+            if sightText and sightText != u'形态':
+                sightPosition += 1
+                targetPokemon = soup.select('tr._toggle.form' + str(sightPosition))[0]
+                parsePokemonPage(soup, targetPokemon, sightText)
+                bRet = True
+    return bRet
 
 def checkPokemonPage(pokemonPage):
     soup = BeautifulSoup(pokemonPage.text, 'lxml')
     pokemonInfoTagList = soup.select('#bodyContent > #mw-content-text > .mw-parser-output > .roundy.a-r.at-c')
     pokemonInfoTag = pokemonInfoTagList[0]
-    attrTag = pokemonInfoTag.select('tr > th > a > span.textblack') #区分是宝可梦页面还是属性页面
-    if len(attrTag) and attrTag[0].text == u'属性列表':
-        print '这是属性。。。。'
-        return
-    parsePokemonPage(pokemonInfoTag) # 解析宝可梦详情页
+    if checkPokemonPageMulti(pokemonInfoTag, soup) == True: return # 去除属性页，解析多形态宝可梦页面
+    parsePokemonPage(soup, pokemonInfoTag) # 解析宝可梦详情页
 
 def getPokemonInfo(indexPage):
     soup = BeautifulSoup(indexPage.text, 'lxml')
@@ -132,8 +118,9 @@ def getPokemonInfo(indexPage):
         i += 1
         #print pokemon
         pokemonUrl = websiteBase + pokemon['href']
-        print pokemonUrl
+        #print pokemonUrl
         pokemonPage = requests.get(pokemonUrl)
+        #if i == 7: checkPokemonPage(pokemonPage)
         checkPokemonPage(pokemonPage)
         sys.stdout.flush()
         #if i >= 4 : break
