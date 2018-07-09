@@ -39,6 +39,13 @@ def getPokemonName(pokemonInfoTag, sightName):# 获取宝可梦名字，包含�
     name_en = pokemonNameList[2].text
     return (name_zh.encode('utf8'), name_jp.encode('utf8'), name_en.encode('utf8'))
 
+def getPokemonImg(pokemonInfoTag):# 获取宝可梦图片
+    pokemonImgTagL = pokemonInfoTag.select('.roundy.bgwhite.fulltable > tr > td > div > a.image > img')
+    pokemonImgTagL += pokemonInfoTag.select('.roundy.bgwhite.fulltable > tr > td > a.image > img')
+    pokeImgUrl = 'http:' + pokemonImgTagL[0]['data-url']
+    pokeImgUrl = pokeImgUrl.replace('300px', '120px')# 获取120像素的图片
+    return pokeImgUrl.encode('utf8')
+
 def getPokemonAttr(pokemonInfoTag):# 获取宝可梦属性，多个属性以丨间隔， 属性：一般、火、虫、水、毒、电、飞行、草、地面、冰、格斗、超能力、岩石、幽灵、龙、恶、钢、妖精
     pokemonAttrL = pokemonInfoTag.select('.bgwhite.fulltable > tr > .roundy > span > a')
     attributes = ""
@@ -54,18 +61,28 @@ def getPokemonClass(pokemonInfoTag):# 获取宝可梦分类
     return pokemonClass.encode('utf8')
 
 def getPokemonFeatures(pokemonInfoTag):# 获取宝可梦特性，普通特性和隐藏特性
-    pokemonFeatureL = pokemonInfoTag.select('.roundy.bgwhite.fulltable > td')
+    normalFeat, hideFeat = '', ''
+    pokemonFeatureL = pokemonInfoTag.select('.roundy.bgwhite.fulltable > tr > td')
     for featureTag in pokemonFeatureL:
-        print featureTag.text.encode('utf8')
+        curFeat = featureTag.a.text.strip()
+        smallTag = featureTag.find('small')
+        if smallTag and smallTag.text.strip() == u'隱藏特性':
+            hideFeat = curFeat
+            continue
+        if normalFeat != "": normalFeat += "|"
+        normalFeat += curFeat
+    return (normalFeat.encode('utf8'), hideFeat.encode('utf8'))
 
 # 注：jarTagL为获取宝可梦信息的容器，包括：
-# 属性、分类、特性、100级时经验值、地区图鉴编号、[地区浏览器编号]
+# 属性、分类、特性、100级时经验值、地区图鉴编号、地区浏览器编号
 # 身高、体重、体形、脚印、图鉴颜色、捕获率、性别比例、培育、取得基础点数、旁支系列
 def parsePokemonPage(soup, pokemonInfoTag, sightName = ''):# 解析宝可梦详情页
     print '*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-'
-    tPokemonName = getPokemonName(pokemonInfoTag, sightName)
-    #print tPokemonName[0], tPokemonName[1], tPokemonName[2]
-    dPokeSn, sPokeAttr, sPokeClass = '', '', ''
+    tPokeName = getPokemonName(pokemonInfoTag, sightName)
+    print tPokeName[0], tPokeName[1], tPokeName[2]
+    sPokeImg = getPokemonImg(pokemonInfoTag)
+    print sPokeImg
+    dPokeSn, sPokeAttr, sPokeClass, tPokeFeat = '', '', '', ''
     jarTagL = pokemonInfoTag.select('table.roundy.bw-1.fulltable > tr > td')
     for jarTag in jarTagL:
         if not jarTag.b: continue
@@ -81,8 +98,18 @@ def parsePokemonPage(soup, pokemonInfoTag, sightName = ''):# 解析宝可梦详�
             sPokeClass = getPokemonClass(jarTag)
             #print sPokeClass
         if bTagText == u'特性':
-            print "~~~~~"
-            getPokemonFeatures(jarTag)
+            tPokeFeat = getPokemonFeatures(jarTag)
+            #print tPokeFeat[0], tPokeFeat[1]
+    evolveTagL = soup(id='.E8.BF.9B.E5.8C.96') # 获取进化节点链接
+    superEvolveTagL = soup(id='.E8.B6.85.E7.B4.9A.E9.80.B2.E5.8C.96') # 获取超级进化节点链接
+    if len(evolveTagL):
+        evolveTag = evolveTagL[0]
+        evolveDetailTag = evolveTag.find_parent().find_next_sibling() # 获取进化节点详细信息（进化链接的父节点的下一个兄弟节点）
+        print evolveDetailTag
+    if len(superEvolveTagL):
+        superEvolveTag = superEvolveTagL[0]
+        superEvolveDetailTag = superEvolveTag.find_parent().find_next_sibling() # 获取超级进化节点详细信息（超级进化链接的父节点的下一个兄弟节点）
+        print superEvolveDetailTag
 
 def checkPokemonPageMulti(pokemonInfoTag, soup):# 去除属性页，解析多形态宝可梦页面
     bRet = False
