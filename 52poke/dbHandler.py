@@ -14,6 +14,7 @@ class ObjSqliteConnector(object):
         if not self.dbPath : return False
         try:
             self.dbConn = sqlite3.connect(self.dbPath)
+            self.dbConn.text_factory = str
             self.dbCursor = self.dbConn.cursor()
             return True
         except:
