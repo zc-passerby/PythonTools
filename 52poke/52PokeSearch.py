@@ -73,6 +73,23 @@ def getPokemonFeatures(pokemonInfoTag):# 获取宝可梦特性，普通特性和
         normalFeat += curFeat
     return (normalFeat.encode('utf8'), hideFeat.encode('utf8'))
 
+def getEvolvePath(evolveDetailTag):
+    print filter(lambda x: x != '\n' , evolveDetailTag.contents)[0]
+
+
+def parseBodyLink(soup):
+    evolveTagL = soup(id='.E8.BF.9B.E5.8C.96') # 获取进化节点链接
+    superEvolveTagL = soup(id='.E8.B6.85.E7.B4.9A.E9.80.B2.E5.8C.96') # 获取超级进化节点链接
+    if len(evolveTagL):
+        evolveTag = evolveTagL[0]
+        evolveDetailTag = evolveTag.find_parent().find_next_sibling() # 获取进化节点详细信息（进化链接的父节点的下一个兄弟节点）
+        #getEvolvePath(evolveDetailTag)
+    if len(superEvolveTagL):
+        superEvolveTag = superEvolveTagL[0]
+        superEvolveDetailTag = superEvolveTag.find_parent().find_next_sibling() # 获取超级进化节点详细信息（超级进化链接的父节点的下一个兄弟节点）
+        #print superEvolveDetailTag
+        getEvolvePath(superEvolveDetailTag)
+
 # 注：jarTagL为获取宝可梦信息的容器，包括：
 # 属性、分类、特性、100级时经验值、地区图鉴编号、地区浏览器编号
 # 身高、体重、体形、脚印、图鉴颜色、捕获率、性别比例、培育、取得基础点数、旁支系列
@@ -100,16 +117,7 @@ def parsePokemonPage(soup, pokemonInfoTag, sightName = ''):# 解析宝可梦详�
         if bTagText == u'特性':
             tPokeFeat = getPokemonFeatures(jarTag)
             #print tPokeFeat[0], tPokeFeat[1]
-    evolveTagL = soup(id='.E8.BF.9B.E5.8C.96') # 获取进化节点链接
-    superEvolveTagL = soup(id='.E8.B6.85.E7.B4.9A.E9.80.B2.E5.8C.96') # 获取超级进化节点链接
-    if len(evolveTagL):
-        evolveTag = evolveTagL[0]
-        evolveDetailTag = evolveTag.find_parent().find_next_sibling() # 获取进化节点详细信息（进化链接的父节点的下一个兄弟节点）
-        print evolveDetailTag
-    if len(superEvolveTagL):
-        superEvolveTag = superEvolveTagL[0]
-        superEvolveDetailTag = superEvolveTag.find_parent().find_next_sibling() # 获取超级进化节点详细信息（超级进化链接的父节点的下一个兄弟节点）
-        print superEvolveDetailTag
+    #parseBodyLink(soup) #暂时先不做这个了。。。
 
 def checkPokemonPageMulti(pokemonInfoTag, soup):# 去除属性页，解析多形态宝可梦页面
     bRet = False
