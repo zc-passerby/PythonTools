@@ -2,7 +2,8 @@
 #-*- coding=utf-8 -*-
 
 import sys, requests, time
-import urllib, urllib2, re
+import urllib, urllib2, re, json
+from dbHandler import ObjSqliteConnector
 from bs4 import BeautifulSoup
 
 websiteBase = "http://wiki.52poke.com"
@@ -73,33 +74,59 @@ def getPokemonFeatures(pokemonInfoTag):# 获取宝可梦特性，普通特性和
         normalFeat += curFeat
     return (normalFeat.encode('utf8'), hideFeat.encode('utf8'))
 
+def getPokemonRacialValue(soup, position):
+    dPokeRace = {}
+    try:
+        hitPointTag = soup.select('tr.bgl-HP')[position]
+        attackTag = hitPointTag.find_next_sibling()
+        defenseTag = attackTag.find_next_sibling()
+        specialAttacTag = defenseTag.find_next_sibling()
+        specialDefenseTag = specialAttacTag.find_next_sibling()
+        speedTag = specialDefenseTag.find_next_sibling()
+        dPokeRace['HP'] = hitPointTag.select('td > table > tr > th')[1].text.strip().encode('utf8')
+        dPokeRace['攻击'] = attackTag.select('td > table > tr > th')[1].text.strip().encode('utf8')
+        dPokeRace['防御'] = defenseTag.select('td > table > tr > th')[1].text.strip().encode('utf8')
+        dPokeRace['特攻'] = specialAttacTag.select('td > table > tr > th')[1].text.strip().encode('utf8')
+        dPokeRace['特防'] = specialDefenseTag.select('td > table > tr > th')[1].text.strip().encode('utf8')
+        dPokeRace['速度'] = speedTag.select('td > table > tr > th')[1].text.strip().encode('utf8')
+        return dPokeRace
+    except:
+        dPokeRace['HP'] = '同原始形态'
+        dPokeRace['攻击'] = '同原始形态'
+        dPokeRace['防御'] = '同原始形态'
+        dPokeRace['特攻'] = '同原始形态'
+        dPokeRace['特防'] = '同原始形态'
+        dPokeRace['速度'] = '同原始形态'
+        return dPokeRace
+
 def getEvolvePath(evolveDetailTag):
     print filter(lambda x: x != '\n' , evolveDetailTag.contents)[0]
 
-
 def parseBodyLink(soup):
-    evolveTagL = soup(id='.E8.BF.9B.E5.8C.96') # 获取进化节点链接
-    superEvolveTagL = soup(id='.E8.B6.85.E7.B4.9A.E9.80.B2.E5.8C.96') # 获取超级进化节点链接
-    if len(evolveTagL):
-        evolveTag = evolveTagL[0]
-        evolveDetailTag = evolveTag.find_parent().find_next_sibling() # 获取进化节点详细信息（进化链接的父节点的下一个兄弟节点）
-        #getEvolvePath(evolveDetailTag)
-    if len(superEvolveTagL):
-        superEvolveTag = superEvolveTagL[0]
-        superEvolveDetailTag = superEvolveTag.find_parent().find_next_sibling() # 获取超级进化节点详细信息（超级进化链接的父节点的下一个兄弟节点）
-        #print superEvolveDetailTag
-        getEvolvePath(superEvolveDetailTag)
+    # evolveTagL = soup(id='.E8.BF.9B.E5.8C.96') # 获取进化节点链接
+    # superEvolveTagL = soup(id='.E8.B6.85.E7.B4.9A.E9.80.B2.E5.8C.96') # 获取超级进化节点链接
+    # if len(evolveTagL):
+    #     evolveTag = evolveTagL[0]
+    #     evolveDetailTag = evolveTag.find_parent().find_next_sibling() # 获取进化节点详细信息（进化链接的父节点的下一个兄弟节点）
+    #     #getEvolvePath(evolveDetailTag)
+    # if len(superEvolveTagL):
+    #     superEvolveTag = superEvolveTagL[0]
+    #     superEvolveDetailTag = superEvolveTag.find_parent().find_next_sibling() # 获取超级进化节点详细信息（超级进化链接的父节点的下一个兄弟节点）
+    #     #print superEvolveDetailTag
+    #     getEvolvePath(superEvolveDetailTag)
+    pass
 
 # 注：jarTagL为获取宝可梦信息的容器，包括：
 # 属性、分类、特性、100级时经验值、地区图鉴编号、地区浏览器编号
 # 身高、体重、体形、脚印、图鉴颜色、捕获率、性别比例、培育、取得基础点数、旁支系列
-def parsePokemonPage(soup, pokemonInfoTag, sightName = ''):# 解析宝可梦详情页
+def parsePokemonPage(soup, pokemonInfoTag, sightName = '', sightPosition = 1):# 解析宝可梦详情页
     print '*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-'
+    sightPosition = sightPosition - 1 # 宝可梦第几种形态，但作为下标要-1
     tPokeName = getPokemonName(pokemonInfoTag, sightName)
     print tPokeName[0], tPokeName[1], tPokeName[2]
     sPokeImg = getPokemonImg(pokemonInfoTag)
     print sPokeImg
-    dPokeSn, sPokeAttr, sPokeClass, tPokeFeat = '', '', '', ''
+    dPokeSn, sPokeAttr, sPokeClass, tPokeFeat, dPokeRace = '', '', '', '', ''
     jarTagL = pokemonInfoTag.select('table.roundy.bw-1.fulltable > tr > td')
     for jarTag in jarTagL:
         if not jarTag.b: continue
@@ -117,7 +144,13 @@ def parsePokemonPage(soup, pokemonInfoTag, sightName = ''):# 解析宝可梦详�
         if bTagText == u'特性':
             tPokeFeat = getPokemonFeatures(jarTag)
             #print tPokeFeat[0], tPokeFeat[1]
+    dPokeRace = getPokemonRacialValue(soup, sightPosition)
     #parseBodyLink(soup) #暂时先不做这个了。。。
+    # 开始插入sqlite数据库啦
+    sqliteConn = ObjSqliteConnector("./52Poke.db3")
+    pokeInfoTuple = (dPokeSn['全国'], json.dumps(dPokeSn, ensure_ascii=False), tPokeName[0], tPokeName[1], tPokeName[2], sPokeImg, sPokeAttr, sPokeClass, tPokeFeat[0], tPokeFeat[1], dPokeRace['HP'], dPokeRace['攻击'], dPokeRace['防御'], dPokeRace['特攻'], dPokeRace['特防'], dPokeRace['速度'])
+    print pokeInfoTuple
+    print sqliteConn.insert('pokemonInfo', [pokeInfoTuple,])
 
 def checkPokemonPageMulti(pokemonInfoTag, soup):# 去除属性页，解析多形态宝可梦页面
     bRet = False
@@ -133,7 +166,7 @@ def checkPokemonPageMulti(pokemonInfoTag, soup):# 去除属性页，解析多形
             if sightText and sightText != u'形态':
                 sightPosition += 1
                 targetPokemon = soup.select('tr._toggle.form' + str(sightPosition))[0]
-                parsePokemonPage(soup, targetPokemon, sightText)
+                parsePokemonPage(soup, targetPokemon, sightText, sightPosition)
                 bRet = True
     return bRet
 
@@ -154,7 +187,13 @@ def getPokemonInfo(indexPage):
         #print pokemon
         pokemonUrl = websiteBase + pokemon['href']
         #print pokemonUrl
-        pokemonPage = requests.get(pokemonUrl)
+        pokemonPage = ''
+        while True:
+            try:
+                pokemonPage = requests.get(pokemonUrl)
+                break
+            except:
+                continue
         #if i == 7: checkPokemonPage(pokemonPage)
         checkPokemonPage(pokemonPage)
         sys.stdout.flush()
