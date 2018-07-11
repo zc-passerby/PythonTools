@@ -63,16 +63,19 @@ def getPokemonClass(pokemonInfoTag):# 获取宝可梦分类
 
 def getPokemonFeatures(pokemonInfoTag):# 获取宝可梦特性，普通特性和隐藏特性
     normalFeat, hideFeat = '', ''
-    pokemonFeatureL = pokemonInfoTag.select('.roundy.bgwhite.fulltable > tr > td')
-    for featureTag in pokemonFeatureL:
-        curFeat = featureTag.a.text.strip()
-        smallTag = featureTag.find('small')
-        if smallTag and smallTag.text.strip() == u'隱藏特性':
-            hideFeat = curFeat
-            continue
-        if normalFeat != "": normalFeat += "|"
-        normalFeat += curFeat
-    return (normalFeat.encode('utf8'), hideFeat.encode('utf8'))
+    try:
+        pokemonFeatureL = pokemonInfoTag.select('.roundy.bgwhite.fulltable > tr > td')
+        for featureTag in pokemonFeatureL:
+            curFeat = featureTag.a.text.strip()
+            smallTag = featureTag.find('small')
+            if smallTag and smallTag.text.strip() == u'隱藏特性':
+                hideFeat = curFeat
+                continue
+            if normalFeat != "": normalFeat += "|"
+            normalFeat += curFeat
+        return (normalFeat.encode('utf8'), hideFeat.encode('utf8'))
+    except:
+        return (normalFeat, hideFeat)
 
 def getPokemonRacialValue(soup, position):
     dPokeRace = {}
@@ -120,7 +123,6 @@ def parseBodyLink(soup):
 # 属性、分类、特性、100级时经验值、地区图鉴编号、地区浏览器编号
 # 身高、体重、体形、脚印、图鉴颜色、捕获率、性别比例、培育、取得基础点数、旁支系列
 def parsePokemonPage(soup, pokemonInfoTag, sightName = '', sightPosition = 1):# 解析宝可梦详情页
-    print '*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-'
     sightPosition = sightPosition - 1 # 宝可梦第几种形态，但作为下标要-1
     tPokeName = getPokemonName(pokemonInfoTag, sightName)
     print tPokeName[0], tPokeName[1], tPokeName[2]
@@ -149,7 +151,7 @@ def parsePokemonPage(soup, pokemonInfoTag, sightName = '', sightPosition = 1):# 
     # 开始插入sqlite数据库啦
     sqliteConn = ObjSqliteConnector("./52Poke.db3")
     pokeInfoTuple = (dPokeSn['全国'], json.dumps(dPokeSn, ensure_ascii=False), tPokeName[0], tPokeName[1], tPokeName[2], sPokeImg, sPokeAttr, sPokeClass, tPokeFeat[0], tPokeFeat[1], dPokeRace['HP'], dPokeRace['攻击'], dPokeRace['防御'], dPokeRace['特攻'], dPokeRace['特防'], dPokeRace['速度'])
-    print pokeInfoTuple
+    #print pokeInfoTuple
     print sqliteConn.insert('pokemonInfo', [pokeInfoTuple,])
 
 def checkPokemonPageMulti(pokemonInfoTag, soup):# 去除属性页，解析多形态宝可梦页面
@@ -185,6 +187,7 @@ def getPokemonInfo(indexPage):
     for pokemon in pokemonList:
         i += 1
         #print pokemon
+        #if i < 1781: continue
         pokemonUrl = websiteBase + pokemon['href']
         #print pokemonUrl
         pokemonPage = ''
@@ -195,6 +198,8 @@ def getPokemonInfo(indexPage):
             except:
                 continue
         #if i == 7: checkPokemonPage(pokemonPage)
+        print '*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-'
+        print i
         checkPokemonPage(pokemonPage)
         sys.stdout.flush()
         #if i >= 4 : break
