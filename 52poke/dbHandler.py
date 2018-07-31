@@ -1,6 +1,8 @@
 #! /usr/bin/env python
-#-*- coding=utf-8 -*-
-import sqlite3, traceback
+# -*- coding=utf-8 -*-
+
+import sqlite3
+import traceback
 
 class ObjSqliteConnector(object):
     """docstring for ObjSqliteConnector"""
@@ -217,4 +219,4 @@ if __name__ == '__main__':
     print sqliteConn.update('abc', ('id', 'name'), (100, 'hahaha'), 'id=?', (1, ))
     print sqliteConn.delete('abc')
     print sqliteConn.delete('abc', 'id=?', (5,))
-    #sqliteConn.dropTable('abc')
+    # sqliteConn.dropTable('abc')
