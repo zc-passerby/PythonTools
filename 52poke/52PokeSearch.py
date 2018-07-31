@@ -1,15 +1,18 @@
 #! /usr/bin/env python
-#-*- coding=utf-8 -*-
+# -*- coding=utf-8 -*-
 
-import sys, requests, time
-import urllib, urllib2, re, json
+import sys
+import requests
+import json
 from dbHandler import ObjSqliteConnector
 from bs4 import BeautifulSoup
 
 websiteBase = "http://wiki.52poke.com"
-websiteHome = "http://wiki.52poke.com/wiki/%E5%AE%9D%E5%8F%AF%E6%A2%A6%E5%88%97%E8%A1%A8%EF%BC%88%E6%8C%89%E5%85%A8%E5%9B%BD%E5%9B%BE%E9%89%B4%E7%BC%96%E5%8F%B7%EF%BC%89"
+websiteHome = "http://wiki.52poke.com/wiki/"\
+              + "%E5%AE%9D%E5%8F%AF%E6%A2%A6%E5%88%97%E8%A1%A8%EF%BC%88%E6%8C"\
+              + "%89%E5%85%A8%E5%9B%BD%E5%9B%BE%E9%89%B4%E7%BC%96%E5%8F%B7%EF%BC%89"
 
-def getPokemonSn(soup, pokemonInfoTag):# 获取宝可梦图鉴编号，包含全国图鉴和各地区图鉴
+def getPokemonSn(soup, pokemonInfoTag):  # 获取宝可梦图鉴编号，包含全国图鉴和各地区图鉴
     snDict = {}
     NationalSn = soup.select('.textblack.bgwhite > a')[0].text.lstrip('#').encode('utf8')
     snDict['全国'] = NationalSn
@@ -30,7 +33,7 @@ def getPokemonSn(soup, pokemonInfoTag):# 获取宝可梦图鉴编号，包含全
                 snDict[region] = td.text.strip().encode('utf8')
     return snDict
 
-def getPokemonName(pokemonInfoTag, sightName):# 获取宝可梦名字，包含中文名、日文名、英文名，其中有多形态的，中文名以：宝可梦原名-宝可梦形态名展示
+def getPokemonName(pokemonInfoTag, sightName):  # 获取宝可梦名字，包含中文名、日文名、英文名，其中有多形态的，中文名以：宝可梦原名-宝可梦形态名展示
     if sightName: sightName = u'-' + sightName
     pokemonNameList = pokemonInfoTag.select('.textblack.bgwhite > span > b')
     pokemonNameList += pokemonInfoTag.select('.textblack.bgwhite > b')
@@ -40,14 +43,14 @@ def getPokemonName(pokemonInfoTag, sightName):# 获取宝可梦名字，包含�
     name_en = pokemonNameList[2].text
     return (name_zh.encode('utf8'), name_jp.encode('utf8'), name_en.encode('utf8'))
 
-def getPokemonImg(pokemonInfoTag):# 获取宝可梦图片
+def getPokemonImg(pokemonInfoTag):  # 获取宝可梦图片
     pokemonImgTagL = pokemonInfoTag.select('.roundy.bgwhite.fulltable > tr > td > div > a.image > img')
     pokemonImgTagL += pokemonInfoTag.select('.roundy.bgwhite.fulltable > tr > td > a.image > img')
     pokeImgUrl = 'http:' + pokemonImgTagL[0]['data-url']
-    pokeImgUrl = pokeImgUrl.replace('300px', '120px')# 获取120像素的图片
+    pokeImgUrl = pokeImgUrl.replace('300px', '120px')  # 获取120像素的图片
     return pokeImgUrl.encode('utf8')
 
-def getPokemonAttr(pokemonInfoTag):# 获取宝可梦属性，多个属性以丨间隔， 属性：一般、火、虫、水、毒、电、飞行、草、地面、冰、格斗、超能力、岩石、幽灵、龙、恶、钢、妖精
+def getPokemonAttr(pokemonInfoTag):  # 获取宝可梦属性，多个属性以丨间隔， 属性：一般、火、虫、水、毒、电、飞行、草、地面、冰、格斗、超能力、岩石、幽灵、龙、恶、钢、妖精
     pokemonAttrL = pokemonInfoTag.select('.bgwhite.fulltable > tr > .roundy > span > a')
     attributes = ""
     for atag in pokemonAttrL:
@@ -56,12 +59,12 @@ def getPokemonAttr(pokemonInfoTag):# 获取宝可梦属性，多个属性以丨�
         attributes += atag.text.strip()
     return attributes.encode('utf8')
 
-def getPokemonClass(pokemonInfoTag):# 获取宝可梦分类
+def getPokemonClass(pokemonInfoTag):  # 获取宝可梦分类
     pokemonClassL = pokemonInfoTag.select('table.roundy.bgwhite.fulltable > tr > td.roundy.bgwhite.bw-1')
     pokemonClass = pokemonClassL[0].text.strip()
     return pokemonClass.encode('utf8')
 
-def getPokemonFeatures(pokemonInfoTag):# 获取宝可梦特性，普通特性和隐藏特性
+def getPokemonFeatures(pokemonInfoTag):  # 获取宝可梦特性，普通特性和隐藏特性
     normalFeat, hideFeat = '', ''
     try:
         pokemonFeatureL = pokemonInfoTag.select('.roundy.bgwhite.fulltable > tr > td')
@@ -135,23 +138,23 @@ def parsePokemonPage(soup, pokemonInfoTag, sightName = '', sightPosition = 1):# 
         bTagText = jarTag.b.text
         if bTagText == u'地区图鉴编号':
             dPokeSn = getPokemonSn(pokemonInfoTag, jarTag)
-            #for k, v in dPokeSn.iteritems():
+            # for k, v in dPokeSn.iteritems():
             #    print k, v
         if bTagText == u'属性':
             sPokeAttr = getPokemonAttr(jarTag)
-            #print sPokeAttr
+            # print sPokeAttr
         if bTagText == u'分类':
             sPokeClass = getPokemonClass(jarTag)
-            #print sPokeClass
+            # print sPokeClass
         if bTagText == u'特性':
             tPokeFeat = getPokemonFeatures(jarTag)
-            #print tPokeFeat[0], tPokeFeat[1]
+            # print tPokeFeat[0], tPokeFeat[1]
     dPokeRace = getPokemonRacialValue(soup, sightPosition)
-    #parseBodyLink(soup) #暂时先不做这个了。。。
+    # parseBodyLink(soup) #暂时先不做这个了。。。
     # 开始插入sqlite数据库啦
     sqliteConn = ObjSqliteConnector("./52Poke.db3")
     pokeInfoTuple = (dPokeSn['全国'], json.dumps(dPokeSn, ensure_ascii=False), tPokeName[0], tPokeName[1], tPokeName[2], sPokeImg, sPokeAttr, sPokeClass, tPokeFeat[0], tPokeFeat[1], dPokeRace['HP'], dPokeRace['攻击'], dPokeRace['防御'], dPokeRace['特攻'], dPokeRace['特防'], dPokeRace['速度'])
-    #print pokeInfoTuple
+    # print pokeInfoTuple
     print sqliteConn.insert('pokemonInfo', [pokeInfoTuple,])
 
 def checkPokemonPageMulti(pokemonInfoTag, soup):# 去除属性页，解析多形态宝可梦页面
