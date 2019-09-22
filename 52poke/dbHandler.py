@@ -4,8 +4,10 @@
 import sqlite3
 import traceback
 
+
 class ObjSqliteConnector(object):
     """docstring for ObjSqliteConnector"""
+
     def __init__(self, dbPath):
         self.dbPath = dbPath
         self.dbConn = None
@@ -13,7 +15,7 @@ class ObjSqliteConnector(object):
         self.conFlag = self._Connect()
 
     def _Connect(self):
-        if not self.dbPath : return False
+        if not self.dbPath: return False
         try:
             self.dbConn = sqlite3.connect(self.dbPath)
             self.dbConn.text_factory = str
@@ -91,7 +93,7 @@ class ObjSqliteConnector(object):
         deleteSql = "DROP TABLE IF EXISTS {0};".format(tableName)
         return self._executeSql(deleteSql)
 
-    def insert(self, tableName, values, columns = ''):
+    def insert(self, tableName, values, columns=''):
         try:
             bRet, Result = False, 'System Error'
             if type(values) != list and type(values[0]) != tuple:
@@ -113,10 +115,10 @@ class ObjSqliteConnector(object):
         finally:
             return (bRet, Result)
 
-    def select(self, tableName, columns = '*', whereClause = '', whereValue = ''):
+    def select(self, tableName, columns='*', whereClause='', whereValue=''):
         try:
             bRet, Result = False, 'System Error'
-            if columns == '' : columns = '*'
+            if columns == '': columns = '*'
             valueCount = 0
             if whereClause != '':
                 valueCount = len(whereValue)
@@ -136,7 +138,7 @@ class ObjSqliteConnector(object):
         finally:
             return (bRet, Result)
 
-    def selectAndGetId(self, tableName, columns = '*', whereClause = '', whereValue = ''):
+    def selectAndGetId(self, tableName, columns='*', whereClause='', whereValue=''):
         bRet, Result = self.select(tableName, columns, whereClause, whereValue)
         if bRet:
             if str(Result[0][0]).isdigit():
@@ -145,7 +147,7 @@ class ObjSqliteConnector(object):
                 bRet, Result = False, 'select result is not a integer'
         return bRet, Result
 
-    def update(self, tableName, columns, values, whereClause = '', whereValue = ''):
+    def update(self, tableName, columns, values, whereClause='', whereValue=''):
         try:
             bRet, Result = False, 'System Error'
             if type(columns) != tuple or type(values) != tuple:
@@ -180,7 +182,7 @@ class ObjSqliteConnector(object):
         finally:
             return (bRet, Result)
 
-    def delete(self, tableName, whereClause = '', whereValue = ''):
+    def delete(self, tableName, whereClause='', whereValue=''):
         try:
             bRet, Result = False, 'System Error'
             valueCount = 0
@@ -202,9 +204,11 @@ class ObjSqliteConnector(object):
         finally:
             return (bRet, Result)
 
+
 if __name__ == '__main__':
     sqliteConn = ObjSqliteConnector("./test.sqlite")
-    print sqliteConn.createTable('abc', ['id integer primary key autoincrement', 'name varchar(128), info varchar(128)'])
+    print sqliteConn.createTable('abc',
+                                 ['id integer primary key autoincrement', 'name varchar(128), info varchar(128)'])
     print sqliteConn.insert('abc', [(1, 'a', 'a'), (2, 'b', 'b'), (3, 'c', 'c')])
     print sqliteConn.insert('abc', [(4, 'd'), (5, 'e')], '(id, name)')
     print sqliteConn.insert('abc', [(4, 'd'), (5, 'e')], '(id, name)')
@@ -216,7 +220,7 @@ if __name__ == '__main__':
     print sqliteConn.selectAndGetId('abc', ('info'), 'id=?', (5,))
     print sqliteConn.update('abc', 'dfd', 'dfd')
     print sqliteConn.update('abc', ('name', 'info'), ('test', 'test'))
-    print sqliteConn.update('abc', ('id', 'name'), (100, 'hahaha'), 'id=?', (1, ))
+    print sqliteConn.update('abc', ('id', 'name'), (100, 'hahaha'), 'id=?', (1,))
     print sqliteConn.delete('abc')
     print sqliteConn.delete('abc', 'id=?', (5,))
     # sqliteConn.dropTable('abc')
