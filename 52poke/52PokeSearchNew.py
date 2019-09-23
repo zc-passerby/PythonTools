@@ -40,11 +40,49 @@ class SinglePokemonPage:
         imageUrl = imageUrl.replace('300px', '120px')  # 获取120像素的图片
         return imageUrl.encode('utf8')
 
+    # 获取宝可梦图鉴编号，包含全国图鉴编号和各地区的图鉴编号
+    # 全国图鉴编号是从pokemonCardTag里直接获取的，地区编号是从信息容器中获取
+    def getSn(self, jarTag):
+        snDict = {}
+        # 全国图鉴编号
+        NationalSn = self.pokemonCardTag.select('.textblack.bgwhite > a')[0].text.lstrip('#').encode('utf8')
+        snDict['全国'] = NationalSn
+        # 地区图鉴编号
+        trTagList = jarTag.select('.roundy.bgwhite.fulltable.textblack > tbody > tr')
+        for trTag in trTagList:
+            # 若是trTag是hide属性，则无需处理
+            if trTag.has_attr('class') and len(trTag['class']) > 0 and trTag['class'][0] == 'hide': continue
+            tdTagList = trTag.select('td')
+            # 若tdTag数量少于1，则无需处理
+            if len(tdTagList) <= 1: continue
+            # 获取地区名称
+            region = tdTagList[0].text.strip().encode('utf8')
+            for i, tdTag in enumerate(tdTagList):
+                if i == 0: continue  # 地区名称已经处理过了
+                if tdTag.has_attr('class') and 'hide' in tdTag['class']: continue
+                targetSn = tdTag.text.strip().strip('#').encode('utf8')
+                if snDict.get(region, None):
+                    snDict[region] = snDict[region] + '/' + targetSn
+                else:
+                    snDict[region] = targetSn
+        return snDict
+
     def run(self):
         nameTuple = self.getName()
         print nameTuple[0], nameTuple[1], nameTuple[2]
         imageUrl = self.getImage()
-        print urllib.unquote(imageUrl)
+        # print urllib.unquote(imageUrl)
+        # jarTagList 中包含各种宝可梦信息
+        # 属性、分类、特性、100级时经验值、地区图鉴编号、地区浏览器编号
+        # 身高、体重、体形、脚印、图鉴颜色、捕获率、性别比例、培育、取得基础点数、旁支系列
+        jarTagList = self.pokemonCardTag.select('table.roundy.bw-1.fulltable > tbody > tr > td')
+        for jarTag in jarTagList:
+            if not jarTag.b: continue  # 若不存在b标签，则无需解析
+            bTagText = jarTag.b.text  # 每个信息容器代表的宝可梦的信息的类型
+            if bTagText == u'地区图鉴编号':
+                dPokemonSn = self.getSn(jarTag)
+                for k, v in dPokemonSn.iteritems():
+                    print k, v
 
 
 def handlePokemonPage(pokemonPage):
