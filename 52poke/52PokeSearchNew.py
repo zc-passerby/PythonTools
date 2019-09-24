@@ -48,7 +48,7 @@ class SinglePokemonPage:
         NationalSn = self.pokemonCardTag.select('.textblack.bgwhite > a')[0].text.lstrip('#').encode('utf8')
         snDict['全国'] = NationalSn
         # 地区图鉴编号
-        trTagList = jarTag.select('.roundy.bgwhite.fulltable.textblack > tbody > tr')
+        trTagList = jarTag.select('table > tbody > tr')
         for trTag in trTagList:
             # 若是trTag是hide属性，则无需处理
             if trTag.has_attr('class') and len(trTag['class']) > 0 and trTag['class'][0] == 'hide': continue
@@ -60,12 +60,71 @@ class SinglePokemonPage:
             for i, tdTag in enumerate(tdTagList):
                 if i == 0: continue  # 地区名称已经处理过了
                 if tdTag.has_attr('class') and 'hide' in tdTag['class']: continue
-                targetSn = tdTag.text.strip().strip('#').encode('utf8')
+                regionalSn = tdTag.text.strip().strip('#').encode('utf8')
                 if snDict.get(region, None):
-                    snDict[region] = snDict[region] + '/' + targetSn
+                    snDict[region] = snDict[region] + '/' + regionalSn
                 else:
-                    snDict[region] = targetSn
+                    snDict[region] = regionalSn
         return snDict
+
+    # 获取宝可梦属性，多个属性以|分隔
+    # 属性：一般、火、虫、水、毒、电、飞行、草、地面、冰、格斗、超能力、岩石、幽灵、龙、恶、钢、妖精
+    def getType(self, jarTag):
+        aTagList = jarTag.select('table > tbody > tr > td > span > a')
+        sType = u""
+        for aTag in aTagList:
+            if sType != "": sType += "|"
+            sType += aTag.text.strip()
+        return sType.encode('utf8')
+
+    # 获取宝可梦的特性，分为普通特性和隐藏特性，多个特性以|分隔
+    # 目前普通特性可能是一个或两个，隐藏特性可能是零个或一个
+    def getFeatures(self, jarTag):
+        sNormalFeat, sHideFeat = u'', u''
+        tdTagList = jarTag.select('table > tbody > tr > td')
+        for tdTag in tdTagList:
+            smallTag = tdTag.find('small')
+            if smallTag and (smallTag.text.strip() == u'隐藏特性' or smallTag.text.strip() == u'隱藏特性'):
+                if sHideFeat != '': sHideFeat += '|'
+                sHideFeat += tdTag.a.text.strip()
+            else:
+                aTagList = tdTag.find_all('a')
+                for aTag in aTagList:
+                    if sNormalFeat != '': sNormalFeat += '|'
+                    sNormalFeat += aTag.text.strip()
+        return (sNormalFeat.encode('utf8'), sHideFeat.encode('utf8'))
+
+    # 获取捕获概率和普通精灵球在满体力下的捕获概率
+    def getCatchRate(self, jarTag):
+        sRate, sFullRate = u'', u''
+        tdTagList = jarTag.select('table > tbody > tr > td')
+        if len(tdTagList) >= 1:
+            tdTag = tdTagList[0]
+            sRate = tdTag.text.strip()
+            smallTag = tdTag.find('small')
+            if smallTag and smallTag.text.strip():
+                sFullRate = smallTag.text.strip()
+                sRate = sRate.replace(sFullRate, '')
+        return (sRate, sFullRate)
+
+    # 获取宝可梦性别比例，如雄性100%
+    # 这里的处理目前有问题需要修改一下子
+    def getGenderRate(self, jarTag):
+        sGenderRate = u''
+        spanTagList = jarTag.select('table > tbody > tr > td > table > tbody > tr > td > span')
+        for spanTag in spanTagList:
+            if sGenderRate != '': sGenderRate += '|'
+            sGenderRate += spanTag.text.strip()
+        return sGenderRate
+
+    # 获取宝可梦信息
+    # 宝可梦分类、100级时的经验值、身高、体重、图鉴颜色
+    def getSingleText(self, jarTag):
+        sResult = u''
+        tdTagList = jarTag.select('table > tbody > tr > td')
+        if len(tdTagList) >= 1:
+            sResult = tdTagList[0].text.strip()
+        return sResult.encode('utf8')
 
     def run(self):
         nameTuple = self.getName()
@@ -81,8 +140,35 @@ class SinglePokemonPage:
             bTagText = jarTag.b.text  # 每个信息容器代表的宝可梦的信息的类型
             if bTagText == u'地区图鉴编号':
                 dPokemonSn = self.getSn(jarTag)
-                for k, v in dPokemonSn.iteritems():
-                    print k, v
+                # for k, v in dPokemonSn.iteritems():
+                #     print k, v
+            elif bTagText == u'属性':
+                sPokemonType = self.getType(jarTag)
+                # print sPokemonType
+            elif bTagText == u'分类':
+                sPokemonCategory = self.getSingleText(jarTag)
+                # print sPokemonCategory
+            elif bTagText == u'特性':
+                tPokemonFeatures = self.getFeatures(jarTag)
+                # print '普通特性:{}, 隐藏特性:{}'.format(tPokemonFeatures[0], tPokemonFeatures[1])
+            elif bTagText == u'100级时经验值':
+                sPokemon100Experience = self.getSingleText(jarTag)
+                # print sPokemon100Experience
+            elif bTagText == u'身高':
+                sPokemonHeight = self.getSingleText(jarTag)
+                # print sPokemonHeight
+            elif bTagText == u'体重':
+                sPokemonWeight = self.getSingleText(jarTag)
+                # print sPokemonWeight
+            elif bTagText == u'图鉴颜色':
+                sPokemonBookColor = self.getSingleText(jarTag)
+                # print sPokemonBookColor
+            elif bTagText == u'捕获率':
+                tPokemonCatchRate = self.getCatchRate(jarTag)
+                # print '捕获率:{}, 满体力捕获率:{}'.format(tPokemonCatchRate[0], tPokemonCatchRate[1])
+            elif bTagText == u'性别比例':
+                sPokemonGenderRate = self.getGenderRate(jarTag)
+                print sPokemonGenderRate
 
 
 def handlePokemonPage(pokemonPage):
