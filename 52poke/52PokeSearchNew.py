@@ -3,22 +3,21 @@
 
 import sys
 import requests
+import random
+import string
 import urllib
 import json
 from bs4 import BeautifulSoup
 
 websiteBase = "http://wiki.52poke.com"
-websiteHome = "http://wiki.52poke.com/wiki/" \
-              + "%E5%AE%9D%E5%8F%AF%E6%A2%A6%E5%88%97%E8%A1%A8%EF%BC%88%E6%8C" \
-              + "%89%E5%85%A8%E5%9B%BD%E5%9B%BE%E9%89%B4%E7%BC%96%E5%8F%B7%EF%BC%89"
 
 
-class SinglePokemonPage:
-    def __init__(self, soup, pokemonCardTag, sightName='', sightPosition=0):
-        self.soup = soup
+# 右上角宝可梦信息卡片，包含宝可梦名称，图片，属性，分类，特性，全国图鉴编号，地区图鉴编号
+# 身高，体重，体形，脚印，图鉴颜色，捕获率，性别比例，蛋群，孵化周期，对战获得的努力值和经验
+class SinglePokemonCard:
+    def __init__(self, pokemonCardTag, sightName=''):
         self.pokemonCardTag = pokemonCardTag
         self.sightName = sightName
-        self.sightPosition = sightPosition - 1
 
     # 获取宝可梦的名字，包含中文名、日文名、英文名，其中有多形态的，中文名为宝可梦名称【形态名】，如：妙蛙花【超级妙蛙花】
     def getName(self):
@@ -29,7 +28,7 @@ class SinglePokemonPage:
         if self.sightName: nameZh = nameZh + u'【' + self.sightName + u'】'
         nameJp = nameTagList[1].text
         nameEn = nameTagList[2].text
-        return (nameZh.encode('utf8'), nameJp.encode('utf8'), nameEn.encode('utf8'))
+        self.tPokemonName = (nameZh.encode('utf8'), nameJp.encode('utf8'), nameEn.encode('utf8'))
 
     # 获取宝可梦图片的Url，后续考虑将图片下载下来
     # 另外，有些宝可梦会有多张图片，后续再考虑处理
@@ -38,7 +37,7 @@ class SinglePokemonPage:
         imageTagList += self.pokemonCardTag.select('.roundy.bgwhite.fulltable > tbody > tr > td > a.image > img')
         imageUrl = 'http:' + imageTagList[0]['data-url']
         imageUrl = imageUrl.replace('300px', '120px')  # 获取120像素的图片
-        return imageUrl.encode('utf8')
+        self.sPokemonImageUrl = imageUrl.encode('utf8')
 
     # 获取宝可梦图鉴编号，包含全国图鉴编号和各地区的图鉴编号
     # 全国图鉴编号是从pokemonCardTag里直接获取的，地区编号是从信息容器中获取
@@ -65,7 +64,7 @@ class SinglePokemonPage:
                     snDict[region] = snDict[region] + '/' + regionalSn
                 else:
                     snDict[region] = regionalSn
-        return snDict
+        self.dPokemonSn = snDict
 
     # 获取宝可梦属性，多个属性以|分隔
     # 属性：一般、火、虫、水、毒、电、飞行、草、地面、冰、格斗、超能力、岩石、幽灵、龙、恶、钢、妖精
@@ -75,7 +74,7 @@ class SinglePokemonPage:
         for aTag in aTagList:
             if sType != "": sType += "|"
             sType += aTag.text.strip()
-        return sType.encode('utf8')
+        self.sPokemonType = sType.encode('utf8')
 
     # 获取宝可梦的特性，分为普通特性和隐藏特性，多个特性以|分隔
     # 目前普通特性可能是一个或两个，隐藏特性可能是零个或一个
@@ -92,7 +91,7 @@ class SinglePokemonPage:
                 for aTag in aTagList:
                     if sNormalFeat != '': sNormalFeat += '|'
                     sNormalFeat += aTag.text.strip()
-        return (sNormalFeat.encode('utf8'), sHideFeat.encode('utf8'))
+        self.tPokemonFeatures = (sNormalFeat.encode('utf8'), sHideFeat.encode('utf8'))
 
     # 获取捕获概率和普通精灵球在满体力下的捕获概率
     def getCatchRate(self, jarTag):
@@ -105,17 +104,39 @@ class SinglePokemonPage:
             if smallTag and smallTag.text.strip():
                 sFullRate = smallTag.text.strip()
                 sRate = sRate.replace(sFullRate, '')
-        return (sRate, sFullRate)
+        self.tPokemonCatchRate = (sRate, sFullRate)
 
-    # 获取宝可梦性别比例，如雄性100%
-    # 这里的处理目前有问题需要修改一下子
+    # 获取宝可梦性别比例，如雄性100%，雄性50%|雌性50%，无性别
     def getGenderRate(self, jarTag):
         sGenderRate = u''
-        spanTagList = jarTag.select('table > tbody > tr > td > table > tbody > tr > td > span')
-        for spanTag in spanTagList:
-            if sGenderRate != '': sGenderRate += '|'
-            sGenderRate += spanTag.text.strip()
-        return sGenderRate
+        tdTagList = jarTag.select('table > tbody > tr > td > table > tbody > tr > td')
+        for tdTag in tdTagList:
+            if tdTag.has_attr('class') and 'hide' in tdTag['class']: continue
+            if len(tdTag.find_all('div')) > 0: continue  # 该处是显示百分比的框子的
+            sGenderRate = tdTag.text.strip()
+        self.sPokemonGenderRate = sGenderRate.encode('utf8')
+
+    # 获取宝可梦的培育信息，包括蛋群和孵化周期
+    def getBreedingInfo(self, jarTag):
+        sEggGroup, sEggCycle = u'', u''
+        tdTagList = jarTag.select('table > tbody > tr > td')
+        if len(tdTagList) >= 2:
+            sEggGroup = tdTagList[0].text.strip()
+            sEggCycle = tdTagList[1].text.strip()
+        self.tPokemonBreedingInfo = (sEggGroup.encode('utf8').replace(' ', ''), sEggCycle.encode('utf8'))
+
+    # 获取与该宝可梦对战可获得的战斗点数和经验
+    def getBattleInfo(self, jarTag):
+        dBattleInfo = {}
+        tdTagList = jarTag.select('table > tbody > tr > td')
+        for tdTag in tdTagList:
+            smallTag = tdTag.find('small')
+            if smallTag and smallTag.text.strip():
+                smallText = smallTag.text.strip()
+                tdText = tdTag.text.strip()
+                content = tdText.replace(smallText, '').encode('utf8').strip().strip('*')
+                dBattleInfo[smallText.encode('utf8')] = content
+        self.dPokemonBattleInfo = dBattleInfo
 
     # 获取宝可梦信息
     # 宝可梦分类、100级时的经验值、身高、体重、图鉴颜色
@@ -127,10 +148,13 @@ class SinglePokemonPage:
         return sResult.encode('utf8')
 
     def run(self):
-        nameTuple = self.getName()
-        print nameTuple[0], nameTuple[1], nameTuple[2]
-        imageUrl = self.getImage()
-        # print urllib.unquote(imageUrl)
+        # 宝可梦名称，中文、日文、英文
+        self.getName()
+        # print self.tPokemonName[0], self.tPokemonName[1], self.tPokemonName[2]
+        # 宝可梦图片
+        self.getImage()
+        # print urllib.unquote(self.sPokemonImageUrl)
+
         # jarTagList 中包含各种宝可梦信息
         # 属性、分类、特性、100级时经验值、地区图鉴编号、地区浏览器编号
         # 身高、体重、体形、脚印、图鉴颜色、捕获率、性别比例、培育、取得基础点数、旁支系列
@@ -139,67 +163,156 @@ class SinglePokemonPage:
             if not jarTag.b: continue  # 若不存在b标签，则无需解析
             bTagText = jarTag.b.text  # 每个信息容器代表的宝可梦的信息的类型
             if bTagText == u'地区图鉴编号':
-                dPokemonSn = self.getSn(jarTag)
-                # for k, v in dPokemonSn.iteritems():
+                self.getSn(jarTag)
+                # for k, v in self.dPokemonSn.iteritems():
                 #     print k, v
             elif bTagText == u'属性':
-                sPokemonType = self.getType(jarTag)
-                # print sPokemonType
+                self.getType(jarTag)
+                # print self.sPokemonType
             elif bTagText == u'分类':
-                sPokemonCategory = self.getSingleText(jarTag)
-                # print sPokemonCategory
+                self.sPokemonCategory = self.getSingleText(jarTag)
+                # print self.sPokemonCategory
             elif bTagText == u'特性':
-                tPokemonFeatures = self.getFeatures(jarTag)
-                # print '普通特性:{}, 隐藏特性:{}'.format(tPokemonFeatures[0], tPokemonFeatures[1])
+                self.getFeatures(jarTag)
+                # print '普通特性:{}, 隐藏特性:{}'.format(self.tPokemonFeatures[0], self.tPokemonFeatures[1])
             elif bTagText == u'100级时经验值':
-                sPokemon100Experience = self.getSingleText(jarTag)
-                # print sPokemon100Experience
+                self.sPokemon100Experience = self.getSingleText(jarTag)
+                # print self.sPokemon100Experience
             elif bTagText == u'身高':
-                sPokemonHeight = self.getSingleText(jarTag)
-                # print sPokemonHeight
+                self.sPokemonHeight = self.getSingleText(jarTag)
+                # print self.sPokemonHeight
             elif bTagText == u'体重':
-                sPokemonWeight = self.getSingleText(jarTag)
-                # print sPokemonWeight
+                self.sPokemonWeight = self.getSingleText(jarTag)
+                # print self.sPokemonWeight
             elif bTagText == u'图鉴颜色':
-                sPokemonBookColor = self.getSingleText(jarTag)
-                # print sPokemonBookColor
+                self.sPokemonBookColor = self.getSingleText(jarTag)
+                # print self.sPokemonBookColor
             elif bTagText == u'捕获率':
-                tPokemonCatchRate = self.getCatchRate(jarTag)
-                # print '捕获率:{}, 满体力捕获率:{}'.format(tPokemonCatchRate[0], tPokemonCatchRate[1])
+                self.getCatchRate(jarTag)
+                # print '捕获率:{}, 满体力捕获率:{}'.format(self.tPokemonCatchRate[0], self.tPokemonCatchRate[1])
             elif bTagText == u'性别比例':
-                sPokemonGenderRate = self.getGenderRate(jarTag)
-                print sPokemonGenderRate
+                self.getGenderRate(jarTag)
+                # print self.sPokemonGenderRate
+            elif bTagText == u'培育':
+                self.getBreedingInfo(jarTag)
+                # print '蛋群为：{}, 孵化周期为：{}'.format(self.tPokemonBreedingInfo[0], self.tPokemonBreedingInfo[1])
+            elif bTagText == u'取得基础点数':
+                self.getBattleInfo(jarTag)
+                # for k, v in self.dPokemonBattleInfo.iteritems():
+                #     print k, v
+        return self.dPokemonSn['全国']
 
 
-def handlePokemonPage(pokemonPage):
-    # 获取目标宝可梦页
-    soup = BeautifulSoup(pokemonPage.text, 'lxml')
-    # 右上角宝可梦信息卡片，包含宝可梦名称，图片，属性，分类，特性，全国图鉴编号，地区图鉴编号
-    # 身高，体重，体形，脚印，图鉴颜色，捕获率，性别比例，蛋群，孵化周期，对战获得的努力值和经验
-    # 若为属性页或多形态宝可梦，则该卡片是属性列表或多形态列表
-    pokemonCardTagList = soup.select('#bodyContent > #mw-content-text > .mw-parser-output > .roundy.a-r.at-c')
-    if len(pokemonCardTagList) == 0: return
-    pokemonCardTag = pokemonCardTagList[0]
-    # 判断宝可梦是否为多形态（mega、不同颜色、原始的样子等）
-    attrTagList = pokemonCardTag.select('tr > th')
-    if len(attrTagList) == 0: return  # 非宝可梦页
-    if attrTagList[0].a.text == u'属性列表':
-        return
-    elif attrTagList[0].a.text == u'形态':
-        sightPosition = 0
-        for sight in attrTagList:
-            sightText = sight.text.strip('\n')
-            if sightText and sightText != u'形态':
-                sightPosition += 1
-                targetPokemonCardTag = soup.select('tr._toggle.form' + str(sightPosition))[0]
-                pokemon = SinglePokemonPage(soup, targetPokemonCardTag, sightText, sightPosition)
-                pokemon.run()
-    else:
-        pokemon = SinglePokemonPage(soup, pokemonCardTag)
-        pokemon.run()
+# 宝可梦详情页
+class SinglePokemonPage:
+    def __init__(self, pokemonPage):
+        # 获取目标宝可梦页
+        self.soup = BeautifulSoup(pokemonPage.text, 'lxml')
+        self.pokemonName = ''
+        self.nationalSn = ''
+        self.speciesStrength = {}
+
+    def getName(self):
+        sPokeName = u''
+        h1TagList = self.soup.select('h1#firstHeading.firstHeading')
+        if len(h1TagList) > 0: sPokeName = h1TagList[0].text.strip()
+        self.pokemonName = sPokeName.encode('utf8')
+
+    # 解析宝可梦种族值
+    def parseSpecies(self, speciesTag):
+        dPokeSpecies = {}
+        hitPointTag = speciesTag.select('tr.bgl-HP')[0]
+        attackTag = hitPointTag.find_next_sibling()
+        defenseTag = attackTag.find_next_sibling()
+        specialAttackTag = defenseTag.find_next_sibling()
+        specialDefenseTag = specialAttackTag.find_next_sibling()
+        speedTag = specialDefenseTag.find_next_sibling()
+        dPokeSpecies['HP'] = hitPointTag.select('td > table > tbody > tr > th')[1].text.strip().encode('utf8')
+        dPokeSpecies['攻击'] = attackTag.select('td > table > tbody > tr > th')[1].text.strip().encode('utf8')
+        dPokeSpecies['防御'] = defenseTag.select('td > table > tbody > tr > th')[1].text.strip().encode('utf8')
+        dPokeSpecies['特攻'] = specialAttackTag.select('td > table > tbody > tr > th')[1].text.strip().encode('utf8')
+        dPokeSpecies['特防'] = specialDefenseTag.select('td > table > tbody > tr > th')[1].text.strip().encode('utf8')
+        dPokeSpecies['速度'] = speedTag.select('td > table > tbody > tr > th')[1].text.strip().encode('utf8')
+        return dPokeSpecies
+
+    # 获取宝可梦的种族值，若有多形态
+    def getSpeciesStrength(self):
+        # 判断是否存在多形态种族值
+        tabTagList = self.soup.select('.tabbertab > .alignt-center')
+        contentTagList = self.soup.select('table.alignt-center')
+        shapeCount = len(contentTagList)
+        if shapeCount > 1 and len(tabTagList) == shapeCount: # 种族值多形态
+            for contentTag in contentTagList:
+                shapeName = contentTag.find_parent()['title'].strip().encode('utf8')
+                dSpecies = self.parseSpecies(contentTag)
+                if shapeName in self.speciesStrength: shapeName = shapeName + ''.join(random.sample(string.ascii_letters + string.digits, 4))
+                self.speciesStrength[shapeName] = dSpecies
+                # for k, v in dSpecies.iteritems():
+                #     print k, v
+        elif shapeCount == 1: # 种族值单形态
+            contentTag = contentTagList[0]
+            dSpecies = self.parseSpecies(contentTag)
+            self.speciesStrength['基础'] = dSpecies
+            # for k, v in dSpecies.iteritems():
+            #     print k, v
+
+    # 获取宝可梦的进化路径，包括进化和超级进化
+    # 目前多路径进化的处理会有问题
+    def getEvolve(self):
+        try:
+            # 进化
+            evolveSpanTagList = self.soup.select('span[id=".E8.BF.9B.E5.8C.96"]')
+            if len(evolveSpanTagList) > 0:
+                evolveDivTag = evolveSpanTagList[0].find_parent().find_next_sibling()
+                tdTagList = evolveDivTag.find_all('td')
+                evolvePath = ''
+                for tdTag in tdTagList:
+                    if tdTag.has_attr('class') and tdTag['class'] == u'textblack':
+                        evolvePath = evolvePath + "=>" + tdTag.text.strip().encode('utf8')
+                    else:
+                        pass
+                print evolvePath
+            # 超级进化
+            megaEvolveSpanTagList = self.soup.select('span[id=".E8.B6.85.E7.B4.9A.E9.80.B2.E5.8C.96"]')
+        except:
+            pass
+
+    def run(self):
+        # 获取宝可梦名字
+        self.getName()
+        # 获取宝可梦信息卡片
+        # 若为属性页或多形态宝可梦，则该卡片是属性列表或多形态列表
+        pokemonCardTagList = self.soup.select('#bodyContent > #mw-content-text > .mw-parser-output > .roundy.a-r.at-c')
+        if len(pokemonCardTagList) == 0: return
+        pokemonCardTag = pokemonCardTagList[0]
+        # 判断宝可梦是否为多形态（mega、不同颜色、原始的样子等）
+        attrTagList = pokemonCardTag.select('tr > th')
+        if len(attrTagList) == 0: return  # 非宝可梦页
+        if attrTagList[0].a.text == u'属性列表':
+            return
+        elif attrTagList[0].a.text == u'形态':
+            sightPosition = 0
+            for sight in attrTagList:
+                sightText = sight.text.strip('\n')
+                if sightText and sightText != u'形态':
+                    sightPosition += 1
+                    targetPokemonCardTag = self.soup.select('tr._toggle.form' + str(sightPosition))[0]
+                    pokemon = SinglePokemonCard(targetPokemonCardTag, sightText)
+                    self.nationalSn = pokemon.run()
+        else:
+            pokemon = SinglePokemonCard(pokemonCardTag)
+            self.nationalSn = pokemon.run()
+
+        print self.nationalSn, self.pokemonName
+        # 获取宝可梦种族值
+        self.getSpeciesStrength()
+        self.getEvolve()
 
 
-def mainEntrance():
+def parsePokemon():
+    websiteHome = "http://wiki.52poke.com/wiki/" \
+                  + "%E5%AE%9D%E5%8F%AF%E6%A2%A6%E5%88%97%E8%A1%A8%EF%BC%88%E6%8C" \
+                  + "%89%E5%85%A8%E5%9B%BD%E5%9B%BE%E9%89%B4%E7%BC%96%E5%8F%B7%EF%BC%89"
     homePage = requests.get(websiteHome)
     soup = BeautifulSoup(homePage.text, 'lxml')
     pokemonTagList = soup.select(
@@ -217,10 +330,10 @@ def mainEntrance():
                 continue
 
         if not pokemonPage: continue
-        handlePokemonPage(pokemonPage)
+        SinglePokemonPage(pokemonPage).run()
         sys.stdout.flush()
         # break
 
 
 if __name__ == '__main__':
-    mainEntrance()
+    parsePokemon()
