@@ -256,27 +256,6 @@ class SinglePokemonPage:
             # for k, v in dSpecies.iteritems():
             #     print k, v
 
-    # 获取宝可梦的进化路径，包括进化和超级进化
-    # 目前多路径进化的处理会有问题
-    def getEvolve(self):
-        try:
-            # 进化
-            evolveSpanTagList = self.soup.select('span[id=".E8.BF.9B.E5.8C.96"]')
-            if len(evolveSpanTagList) > 0:
-                evolveDivTag = evolveSpanTagList[0].find_parent().find_next_sibling()
-                tdTagList = evolveDivTag.find_all('td')
-                evolvePath = ''
-                for tdTag in tdTagList:
-                    if tdTag.has_attr('class') and tdTag['class'] == u'textblack':
-                        evolvePath = evolvePath + "=>" + tdTag.text.strip().encode('utf8')
-                    else:
-                        pass
-                print evolvePath
-            # 超级进化
-            megaEvolveSpanTagList = self.soup.select('span[id=".E8.B6.85.E7.B4.9A.E9.80.B2.E5.8C.96"]')
-        except:
-            pass
-
     def run(self):
         # 获取宝可梦名字
         self.getName()
@@ -306,7 +285,6 @@ class SinglePokemonPage:
         print self.nationalSn, self.pokemonName
         # 获取宝可梦种族值
         self.getSpeciesStrength()
-        self.getEvolve()
 
 
 def parsePokemon():
