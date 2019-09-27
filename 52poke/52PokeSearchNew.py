@@ -7,9 +7,12 @@ import random
 import string
 import urllib
 import json
+from dbHandler import ObjSqliteConnector
 from bs4 import BeautifulSoup
 
 websiteBase = "http://wiki.52poke.com"
+# 全局sqlite连接
+sqliteConn = ObjSqliteConnector("./52Poke.db3")
 
 
 # 右上角宝可梦信息卡片，包含宝可梦名称，图片，属性，分类，特性，全国图鉴编号，地区图鉴编号
@@ -78,20 +81,20 @@ class SinglePokemonCard:
 
     # 获取宝可梦的特性，分为普通特性和隐藏特性，多个特性以|分隔
     # 目前普通特性可能是一个或两个，隐藏特性可能是零个或一个
-    def getFeatures(self, jarTag):
-        sNormalFeat, sHideFeat = u'', u''
+    def getAbilities(self, jarTag):
+        sNormalAbility, sHiddenAbility = u'', u''
         tdTagList = jarTag.select('table > tbody > tr > td')
         for tdTag in tdTagList:
             smallTag = tdTag.find('small')
             if smallTag and (smallTag.text.strip() == u'隐藏特性' or smallTag.text.strip() == u'隱藏特性'):
-                if sHideFeat != '': sHideFeat += '|'
-                sHideFeat += tdTag.a.text.strip()
+                if sHiddenAbility != '': sHiddenAbility += '|'
+                sHiddenAbility += tdTag.a.text.strip()
             else:
                 aTagList = tdTag.find_all('a')
                 for aTag in aTagList:
-                    if sNormalFeat != '': sNormalFeat += '|'
-                    sNormalFeat += aTag.text.strip()
-        self.tPokemonFeatures = (sNormalFeat.encode('utf8'), sHideFeat.encode('utf8'))
+                    if sNormalAbility != '': sNormalAbility += '|'
+                    sNormalAbility += aTag.text.strip()
+        self.tPokemonAbilities = (sNormalAbility.encode('utf8'), sHiddenAbility.encode('utf8'))
 
     # 获取捕获概率和普通精灵球在满体力下的捕获概率
     def getCatchRate(self, jarTag):
@@ -107,14 +110,14 @@ class SinglePokemonCard:
         self.tPokemonCatchRate = (sRate, sFullRate)
 
     # 获取宝可梦性别比例，如雄性100%，雄性50%|雌性50%，无性别
-    def getGenderRate(self, jarTag):
-        sGenderRate = u''
+    def getGenderRatio(self, jarTag):
+        sGenderRatio = u''
         tdTagList = jarTag.select('table > tbody > tr > td > table > tbody > tr > td')
         for tdTag in tdTagList:
             if tdTag.has_attr('class') and 'hide' in tdTag['class']: continue
             if len(tdTag.find_all('div')) > 0: continue  # 该处是显示百分比的框子的
-            sGenderRate = tdTag.text.strip()
-        self.sPokemonGenderRate = sGenderRate.encode('utf8')
+            sGenderRatio = tdTag.text.strip()
+        self.sPokemonGenderRatio = sGenderRatio.encode('utf8')
 
     # 获取宝可梦的培育信息，包括蛋群和孵化周期
     def getBreedingInfo(self, jarTag):
@@ -147,6 +150,18 @@ class SinglePokemonCard:
             sResult = tdTagList[0].text.strip()
         return sResult.encode('utf8')
 
+    # 将宝可梦数据插入到数据库中
+    def doDatabaseInsert(self):
+        pokemonBaseInfoTuple = (
+            self.dPokemonSn['全国'], json.dumps(self.dPokemonSn, ensure_ascii=False), self.tPokemonName[0],
+            self.tPokemonName[1], self.tPokemonName[2], self.sPokemonImageUrl, self.sPokemonType,
+            self.sPokemonCategory, self.tPokemonAbilities[0], self.tPokemonAbilities[1],
+            self.sPokemon100Experience, self.sPokemonHeight, self.sPokemonWeight, self.sPokemonBookColor,
+            self.tPokemonCatchRate[0], self.tPokemonCatchRate[1], self.sPokemonGenderRatio,
+            self.tPokemonBreedingInfo[0], self.tPokemonBreedingInfo[1],
+            json.dumps(self.dPokemonBattleInfo, ensure_ascii=False))
+        print sqliteConn.insert('PokemonBaseInfo', [pokemonBaseInfoTuple, ])
+
     def run(self):
         # 宝可梦名称，中文、日文、英文
         self.getName()
@@ -173,8 +188,8 @@ class SinglePokemonCard:
                 self.sPokemonCategory = self.getSingleText(jarTag)
                 # print self.sPokemonCategory
             elif bTagText == u'特性':
-                self.getFeatures(jarTag)
-                # print '普通特性:{}, 隐藏特性:{}'.format(self.tPokemonFeatures[0], self.tPokemonFeatures[1])
+                self.getAbilities(jarTag)
+                # print '普通特性:{}, 隐藏特性:{}'.format(self.tPokemonAbilities[0], self.tPokemonAbilities[1])
             elif bTagText == u'100级时经验值':
                 self.sPokemon100Experience = self.getSingleText(jarTag)
                 # print self.sPokemon100Experience
@@ -191,8 +206,8 @@ class SinglePokemonCard:
                 self.getCatchRate(jarTag)
                 # print '捕获率:{}, 满体力捕获率:{}'.format(self.tPokemonCatchRate[0], self.tPokemonCatchRate[1])
             elif bTagText == u'性别比例':
-                self.getGenderRate(jarTag)
-                # print self.sPokemonGenderRate
+                self.getGenderRatio(jarTag)
+                # print self.sPokemonGenderRatio
             elif bTagText == u'培育':
                 self.getBreedingInfo(jarTag)
                 # print '蛋群为：{}, 孵化周期为：{}'.format(self.tPokemonBreedingInfo[0], self.tPokemonBreedingInfo[1])
@@ -200,6 +215,8 @@ class SinglePokemonCard:
                 self.getBattleInfo(jarTag)
                 # for k, v in self.dPokemonBattleInfo.iteritems():
                 #     print k, v
+        # 将所有数据插入到数据库
+        self.doDatabaseInsert()
         return self.dPokemonSn['全国']
 
 
@@ -210,7 +227,7 @@ class SinglePokemonPage:
         self.soup = BeautifulSoup(pokemonPage.text, 'lxml')
         self.pokemonName = ''
         self.nationalSn = ''
-        self.speciesStrength = {}
+        self.dSpeciesStrength = {}
 
     def getName(self):
         sPokeName = u''
@@ -241,20 +258,30 @@ class SinglePokemonPage:
         tabTagList = self.soup.select('.tabbertab > .alignt-center')
         contentTagList = self.soup.select('table.alignt-center')
         shapeCount = len(contentTagList)
-        if shapeCount > 1 and len(tabTagList) == shapeCount: # 种族值多形态
+        if shapeCount > 1 and len(tabTagList) == shapeCount:  # 种族值多形态
             for contentTag in contentTagList:
                 shapeName = contentTag.find_parent()['title'].strip().encode('utf8')
                 dSpecies = self.parseSpecies(contentTag)
-                if shapeName in self.speciesStrength: shapeName = shapeName + ''.join(random.sample(string.ascii_letters + string.digits, 4))
-                self.speciesStrength[shapeName] = dSpecies
+                if shapeName in self.dSpeciesStrength: shapeName = shapeName + ''.join(
+                    random.sample(string.ascii_letters + string.digits, 4))
+                self.dSpeciesStrength[shapeName] = dSpecies
                 # for k, v in dSpecies.iteritems():
                 #     print k, v
-        elif shapeCount == 1: # 种族值单形态
+        elif shapeCount == 1:  # 种族值单形态
             contentTag = contentTagList[0]
             dSpecies = self.parseSpecies(contentTag)
-            self.speciesStrength['基础'] = dSpecies
+            self.dSpeciesStrength['基础'] = dSpecies
             # for k, v in dSpecies.iteritems():
             #     print k, v
+
+    def doDatabaseInsert(self):
+        insertList = []
+        for k, v in self.dSpeciesStrength.iteritems():
+            totalValue = int(v['HP']) + int(v['攻击']) + int(v['防御']) + int(v['特攻']) + int(v['特防']) + int(v['速度'])
+            pokemonSpeciesStrengthTuple = (
+                self.nationalSn, self.pokemonName, k, v['HP'], v['攻击'], v['防御'], v['特攻'], v['特防'], v['速度'], totalValue)
+            insertList.append(pokemonSpeciesStrengthTuple)
+        print sqliteConn.insert('PokemonSpeciesStrength', insertList)
 
     def run(self):
         # 获取宝可梦名字
@@ -285,6 +312,12 @@ class SinglePokemonPage:
         print self.nationalSn, self.pokemonName
         # 获取宝可梦种族值
         self.getSpeciesStrength()
+        self.doDatabaseInsert()
+
+
+def ClearAllDataFromDatabase():
+    print sqliteConn.delete('PokemonBaseInfo')
+    print sqliteConn.delete('PokemonSpeciesStrength')
 
 
 def parsePokemon():
@@ -314,4 +347,5 @@ def parsePokemon():
 
 
 if __name__ == '__main__':
+    ClearAllDataFromDatabase()
     parsePokemon()

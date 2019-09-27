@@ -224,5 +224,10 @@ def getPokemonInfo(indexPageObj):
         # if i >= 4 : break
 
 
-indexPage = requests.get(websiteHome)
-getPokemonInfo(indexPage)
+def mainEntrance():
+    indexPage = requests.get(websiteHome)
+    getPokemonInfo(indexPage)
+
+
+if __name__ == '__main__':
+    mainEntrance()
