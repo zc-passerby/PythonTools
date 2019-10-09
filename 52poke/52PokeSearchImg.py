@@ -54,6 +54,127 @@ def getPokemonImage(browser, linkElement, cropPosition, imageFileName, repair=Fa
             fOut.write("{} {}\n".format(imageFileName, linkElement.text.encode('utf8').split(' ')[-1].strip()))
 
 
+def getPokemonEvolve(browser, pokemonName, evolveLink, megaEvolveLink, transformEvolveLink):
+    # 进化
+    if evolveLink:
+        cropPosition = (235, 21, 73, 8)
+        imageFileName = 'images/evolveImg/{}.png'.format(pokemonName)
+        getPokemonImage(browser, evolveLink, cropPosition, imageFileName, True)
+    # 超级进化
+    if megaEvolveLink:
+        cropPosition = (235, 18, 73, 11)
+        imageFileName = 'images/megaEvolveImg/{}.png'.format(pokemonName)
+        getPokemonImage(browser, megaEvolveLink, cropPosition, imageFileName)
+    # 形态变化
+    if transformEvolveLink:
+        cropPosition = (235, 21, 73, 8)
+        imageFileName = 'images/transformImg/{}.png'.format(pokemonName)
+        getPokemonImage(browser, transformEvolveLink, cropPosition, imageFileName)
+
+
+def getCropImage(**kwargs):
+    browser = kwargs['browser']
+    cropElement = kwargs['cropElement']
+    cropLink = kwargs['cropLink']
+    cropPosition = kwargs['cropPosition']
+    imageFileName = kwargs['imageFileName']
+    cssSelector = kwargs['cssSelector']
+    position = kwargs.get('position', 0)
+    # repair = kwargs.get('repair', False)
+    try:
+        targetElement = cropElement.find_elements_by_css_selector(cssSelector)[position]
+        width = targetElement.size['width']
+        height = targetElement.size['height']
+        print width, height
+        # 设置窗口大小
+        # browser.set_window_size(width + 320, height + 300)
+        # 转到链接节点
+        # linkElement.click()
+        browser.get(cropLink.get_attribute('href'))
+        time.sleep(2)  # 暂停2s等待图片加载完成
+        # 重新设置窗口大小后，元素大小可能会出现偏差，根据repair参数来确定是否要修复偏差
+        # targetElement = cropElement.find_elements_by_css_selector(cssSelector)[position]
+        # print targetElement.size['width'], targetElement.size['height']
+        # widthOffset = (targetElement.size['width'] - width) / 2
+        # # heightOffset = (targetElement.size['height'] - height) / 2
+        # heightOffset = targetElement.size['height'] - height
+        # if repair:
+        #     cropPosition = (cropPosition[0] - widthOffset, cropPosition[1],
+        #                     cropPosition[2] - widthOffset, cropPosition[3] - heightOffset)
+        # print '{}偏移: ({}, {})'.format(cropLink.text.encode('utf8').split(' ')[-1].strip(), widthOffset,
+        #                               heightOffset)
+        # 进行截图和图片处理
+        browser.get_screenshot_as_file(imageFileName)
+        im = Image.open(imageFileName)
+        im = im.crop((cropPosition[0], cropPosition[1], cropPosition[2] + width, cropPosition[3] + height))
+        im.save(imageFileName)
+        # 图片压缩，仅针对linux
+        if platform.system() == 'Linux':
+            os.popen(
+                'optipng "{}/{}" >/dev/null 2>&1'.format(os.getcwd(), imageFileName))
+    except:
+        print '[ERROR]获取信息失败！{}'.format(traceback.format_exc())
+        with open('images/errorLog', 'ab') as fOut:
+            fOut.write("{} {}\n".format(imageFileName, cropLink.text.encode('utf8').split(' ')[-1].strip()))
+
+
+def getPokemonSpeciesStrength(browser, pokemonName, speciesStrengthLink):
+    if not speciesStrengthLink: return
+    try:
+        browser.set_window_size(1366, 768)
+        # 获取目的元素以及大小
+        targetId = speciesStrengthLink.get_attribute('href').split('#')[-1]
+        speciesElement = browser.find_element_by_xpath(
+            '//span[@id="{}"]/../following-sibling::*'.format(targetId))
+        tabElementList = speciesElement.find_elements_by_css_selector("div > ul > li")
+        dParams = {
+            'browser': browser,
+            'cropElement': speciesElement,
+            'cropLink': speciesStrengthLink,
+            'cssSelector': 'table.roundy.alignt-center > tbody'
+        }
+        if len(tabElementList) == 0:
+            dParams['cropPosition'] = (199, 16, 210, 28)
+            dParams['imageFileName'] = 'images/speciesStrength1/{}.png'.format(pokemonName)
+            getCropImage(**dParams)
+        else:
+            for pos, tabElement in enumerate(tabElementList):
+                tabElement.click()
+                dParams['position'] = pos
+                dParams['cropPosition'] = (205, 60, 216, 72)
+                dParams['imageFileName'] = 'images/speciesStrength1/{}_{}.png'.format(pokemonName,
+                                                                                      tabElement.text.encode('utf8'))
+                getCropImage(**dParams)
+    except:
+        print '[ERROR]获取信息失败！{}'.format(traceback.format_exc())
+
+
+def getPokemonTypeOpposite(browser, pokemonName, TypeOppositeLink):
+    if not TypeOppositeLink: return
+    try:
+        browser.set_window_size(1366, 768)
+        # 获取目的元素以及大小
+        targetId = TypeOppositeLink.get_attribute('href').split('#')[-1]
+        typeElement = browser.find_element_by_xpath(
+            '//span[@id="{}"]/../following-sibling::*'.format(targetId))
+        tabElementList = typeElement.find_elements_by_css_selector("div > ul > li")
+        dParams = {
+            'browser': browser,
+            'cropElement': typeElement,
+            'cropLink': TypeOppositeLink,
+            'cssSelector': 'table.roundy > tbody'
+        }
+        for pos, tabElement in enumerate(tabElementList):
+            tabElement.click()
+            dParams['position'] = pos
+            dParams['cropPosition'] = (245, 63, 66, 125)
+            dParams['imageFileName'] = 'images/typeOpposite/{}_{}.png'.format(pokemonName,
+                                                                              tabElement.text.encode('utf8'))
+            getCropImage(**dParams)
+    except:
+        print "error:{}".format(traceback.format_exc())
+
+
 def parsePokemon(browser, quoteName, bSingle):
     HomeUrl = 'https://wiki.52poke.com/wiki/'
     # 打开第一个宝可梦位置
@@ -62,7 +183,6 @@ def parsePokemon(browser, quoteName, bSingle):
     while True:
         # 获取宝可梦名称
         pokemonName = browser.find_element_by_tag_name('h1').text.strip()
-        pokemonNameLen = len(pokemonName) * 2
         print '===================={}===================='.format(pokemonName.encode('utf8'))
         # 获取下一个宝可梦的超链接
         nextPokemonButton = \
@@ -71,8 +191,9 @@ def parsePokemon(browser, quoteName, bSingle):
         pokemonName = pokemonName.encode('utf8')
         # windows中用utf8中文为文件名的话无法保存文件
         if platform.system() == 'Windows': pokemonName = pokemonName.decode('utf8').encode('gb2312')
-        # 获取目录中的链接，目前使用进化、超级进化、形态变化
+        # 获取目录中的链接，目前使用进化、超级进化、形态变化、种族值
         evolveLink, megaEvolveLink, transformEvolveLink = None, None, None
+        speciesStrengthLink, TypeOppositeLink = None, None
         aTagList = browser.find_elements_by_xpath('//div[@id="toc"]//a')
         for aTag in aTagList:
             aTagText = aTag.text.encode('utf8').split(' ')[-1].strip()
@@ -82,24 +203,17 @@ def parsePokemon(browser, quoteName, bSingle):
                 megaEvolveLink = aTag
             elif aTagText == '形态变化' or aTagText == '形態變化':
                 transformEvolveLink = aTag
+            elif aTagText == '种族值' or aTagText == '種族值':
+                speciesStrengthLink = aTag
+            elif aTagText == '属性相性' or aTagText == '屬性相性':
+                TypeOppositeLink = aTag
+
         # if evolveLink: print evolveLink.get_attribute('href').split('#')[-1]
         # if megaEvolveLink: print megaEvolveLink.get_attribute('href').split('#')[-1]
         # if transformEvolveLink: print transformEvolveLink.get_attribute('href').split('#')[-1]
-        # 进化
-        if evolveLink:
-            cropPosition = (235, 21, 73, 8)
-            imageFileName = 'images/evolveImg/{}.png'.format(pokemonName)
-            getPokemonImage(browser, evolveLink, cropPosition, imageFileName, True)
-        # 超级进化
-        if megaEvolveLink:
-            cropPosition = (235, 18, 73, 11)
-            imageFileName = 'images/megaEvolveImg/{}.png'.format(pokemonName)
-            getPokemonImage(browser, megaEvolveLink, cropPosition, imageFileName)
-        # 形态变化
-        if transformEvolveLink:
-            cropPosition = (235, 21, 73, 8)
-            imageFileName = 'images/transformImg/{}.png'.format(pokemonName)
-            getPokemonImage(browser, transformEvolveLink, cropPosition, imageFileName)
+        # getPokemonEvolve(browser, pokemonName, evolveLink, megaEvolveLink, transformEvolveLink)
+        getPokemonSpeciesStrength(browser, pokemonName, speciesStrengthLink)
+        # getPokemonTypeOpposite(browser, pokemonName, TypeOppositeLink)
         # 若仅解析单个宝可梦，则不需要进入下个宝可梦页面
         if bSingle: break
         # 点击解析下一个宝可梦
@@ -117,7 +231,7 @@ def mainEntrance(pokemonName='', bSingle=True):
     # 把chrome设置成无界面模式，不论windows还是linux都可以，自动适配对应参数
     option.headless = True
     option.add_argument('--no-sandbox')
-    # option.add_argument('--window-size=1980,1080')  # 指定浏览器窗口大小
+    # option.add_argument('--window-size=1366,768')  # 指定浏览器窗口大小
     option.add_argument('-start-maximized')  # 浏览器窗口最大化
     option.add_argument('--disable-gpu')  # 谷歌文档提到需要加上这个属性来规避bug
     option.add_argument('--hide-scrollbars')  # 隐藏滚动条, 应对一些特殊页面
@@ -156,6 +270,6 @@ if __name__ == '__main__':
             with open(content, 'rb') as fIn:
                 pokemonList = fIn.readlines()
                 for pokemonName in pokemonList:
-                    mainEntrance(pokemonName)
+                    mainEntrance(pokemonName.strip())
         elif mode == "START":
             mainEntrance(content, False)
