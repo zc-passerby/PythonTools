@@ -2,6 +2,8 @@
 # -*- coding=utf-8 -*-
 
 import sys
+import traceback
+
 import requests
 import random
 import string
@@ -154,7 +156,7 @@ class SinglePokemonCard:
     def doDatabaseInsert(self):
         pokemonBaseInfoTuple = (
             self.dPokemonSn['全国'], json.dumps(self.dPokemonSn, ensure_ascii=False), self.tPokemonName[0],
-            self.tPokemonName[1], self.tPokemonName[2], self.sPokemonImageUrl, self.sPokemonType,
+            self.tPokemonName[1], self.tPokemonName[2].lower(), self.sPokemonImageUrl, self.sPokemonType,
             self.sPokemonCategory, self.tPokemonAbilities[0], self.tPokemonAbilities[1],
             self.sPokemon100Experience, self.sPokemonHeight, self.sPokemonWeight, self.sPokemonBookColor,
             self.tPokemonCatchRate[0], self.tPokemonCatchRate[1], self.sPokemonGenderRatio,
@@ -216,7 +218,7 @@ class SinglePokemonCard:
                 # for k, v in self.dPokemonBattleInfo.iteritems():
                 #     print k, v
         # 将所有数据插入到数据库
-        self.doDatabaseInsert()
+        # self.doDatabaseInsert()
         return self.dPokemonSn['全国']
 
 
@@ -228,6 +230,7 @@ class SinglePokemonPage:
         self.pokemonName = ''
         self.nationalSn = ''
         self.dSpeciesStrength = {}
+        self.dMovements = {}
 
     def getName(self):
         sPokeName = u''
@@ -274,6 +277,83 @@ class SinglePokemonPage:
             # for k, v in dSpecies.iteritems():
             #     print k, v
 
+    def parseTrTagByMovementType(self, trTag, movementType):
+        i = 0
+        retList = []
+        # 每个招式的详情
+        for tdTag in trTag.select("td[class!='hide']"):
+            content = tdTag.text.encode('utf8').strip()
+            if movementType == '可学会的招式' and i == 1:
+                content = content.replace('[详]', '')
+            retList.append(content)
+            i = i + 1
+        return retList
+
+    def getTargetMovements(self, parseTag, multi):
+        bBreak = False
+        alreadyCheck = False
+        targetName = '《太阳／月亮／究极之日／究极之月》'
+        if multi: targetName = parseTag.text.encode('utf8').strip()
+        print 'targetName:' + targetName
+        while True:
+            movementType = parseTag.text.encode('utf8').strip()
+            if multi and alreadyCheck == False and parseTag.name == 'h4':
+                parseTag = parseTag.find_next_sibling()
+                movementType = parseTag.text.encode('utf8').strip()
+                alreadyCheck = True
+            print 'movementType:' + movementType
+            if movementType not in movementsTitleList:
+                print "----" + movementType
+                break
+            # print parseTag.name, movementType
+            parseTag = parseTag.find_next_sibling()
+            if parseTag.name != 'table':
+                print '{} 解析失败'.format(self.pokemonName)
+                bBreak = True
+                break
+            # 获取相应招式列表
+            trTagList = parseTag.tbody.select('tr.bgwhite.at-c')
+            movementList = []
+            for trTag in trTagList:
+                movementList.append(self.parseTrTagByMovementType(trTag, movementType))
+            self.dMovements[movementType] = movementList
+            parseTag = parseTag.find_next_sibling()
+            # print json.dumps(self.dMovements, ensure_ascii=False).decode('string_escape')
+        return parseTag, bBreak
+
+    # 获取宝可梦的招式列表
+    def getPokemonMovements(self):
+        self.dMovements.clear()
+        # 获取招式的链接ID
+        bFind = False
+        targetLiTagIdList = []
+        menuLiTagList = self.soup.select('div.toc#toc > ul > li > ul > li.toclevel-2')
+        for liTag in menuLiTagList:
+            for tag in liTag.children:
+                if tag.name == 'a':
+                    aTagText = tag.text.encode('utf8').split(' ')[-1].strip()
+                    if aTagText == '可学会招式表' or aTagText == '可學會招式錶':
+                        bFind = True
+                if tag.name == '':
+
+            if bFind: break
+
+
+        # if targetId == '':
+        #     print '{} 未检测到可学会招式表'.format(self.pokemonName)
+        #     return
+        # tempTag = self.soup.find(id=targetId).parent.find_next_sibling()
+        # while True:
+        #     # 下个节点为h4，否则可能存在问题，若是有多世代的列举，h4标签后还会有h5标签
+        #     if tempTag.name != 'h4':
+        #         print '{} 可学会招式表有问题'.format(self.pokemonName)
+        #         return
+        #     multi = False
+        #     if tempTag.find_next_sibling().name == 'h5': multi = True
+        #     tempTag, bBreak = self.getTargetMovements(tempTag, multi)
+        #     if bBreak: break
+
+
     def doDatabaseInsert(self):
         insertList = []
         for k, v in self.dSpeciesStrength.iteritems():
@@ -312,7 +392,8 @@ class SinglePokemonPage:
         print self.nationalSn, self.pokemonName
         # 获取宝可梦种族值
         self.getSpeciesStrength()
-        self.doDatabaseInsert()
+        # self.doDatabaseInsert()
+        self.getPokemonMovements()
 
 
 def ClearAllDataFromDatabase():
@@ -320,32 +401,52 @@ def ClearAllDataFromDatabase():
     print sqliteConn.delete('PokemonSpeciesStrength')
 
 
-def parsePokemon():
-    websiteHome = "http://wiki.52poke.com/wiki/" \
-                  + "%E5%AE%9D%E5%8F%AF%E6%A2%A6%E5%88%97%E8%A1%A8%EF%BC%88%E6%8C" \
-                  + "%89%E5%85%A8%E5%9B%BD%E5%9B%BE%E9%89%B4%E7%BC%96%E5%8F%B7%EF%BC%89"
-    homePage = requests.get(websiteHome)
-    soup = BeautifulSoup(homePage.text, 'lxml')
-    pokemonTagList = soup.select(
-        '.mw-body-content > .mw-content-ltr > .mw-parser-output > .eplist > tbody > tr > td > a')
+def parsePokemon(pokemonName, bSingle):
+    if pokemonName == '妙蛙种子' and bSingle == False:
+        websiteHome = "http://wiki.52poke.com/wiki/" \
+                      + "%E5%AE%9D%E5%8F%AF%E6%A2%A6%E5%88%97%E8%A1%A8%EF%BC%88%E6%8C" \
+                      + "%89%E5%85%A8%E5%9B%BD%E5%9B%BE%E9%89%B4%E7%BC%96%E5%8F%B7%EF%BC%89"
+        homePage = requests.get(websiteHome)
+        soup = BeautifulSoup(homePage.text, 'lxml')
+        pokemonTagList = soup.select(
+            '.mw-body-content > .mw-content-ltr > .mw-parser-output > .eplist > tbody > tr > td > a')
 
-    for pokemonUrlTag in pokemonTagList:
-        pokemonUrl = websiteBase + pokemonUrlTag['href']
+        for pokemonUrlTag in pokemonTagList:
+            pokemonUrl = websiteBase + pokemonUrlTag['href']
 
-        pokemonPage = None
-        while True:
-            try:
-                pokemonPage = requests.get(pokemonUrl)
-                break
-            except:
-                continue
+            pokemonPage = None
+            while True:
+                try:
+                    pokemonPage = requests.get(pokemonUrl)
+                    break
+                except:
+                    continue
 
-        if not pokemonPage: continue
-        SinglePokemonPage(pokemonPage).run()
-        sys.stdout.flush()
-        # break
+            if not pokemonPage: continue
+            SinglePokemonPage(pokemonPage).run()
+            sys.stdout.flush()
+    elif bSingle:
+        pokemonName = urllib.quote(pokemonName)
+        pokemonUrl = 'http://wiki.52poke.com/wiki/' + pokemonName
+        try:
+            pokemonPage = requests.get(pokemonUrl)
+            SinglePokemonPage(pokemonPage).run()
+            sys.stdout.flush()
+        except:
+            print traceback.format_exc()
+
+
+def mainEntrance(pokemonName='', bSingle=True):
+    if pokemonName == '':
+        pokemonName = '妙蛙种子'
+        bSingle = False
+    # ClearAllDataFromDatabase()
+    parsePokemon(pokemonName, bSingle)
 
 
 if __name__ == '__main__':
-    ClearAllDataFromDatabase()
-    parsePokemon()
+    args = len(sys.argv)
+    if args <= 1:
+        mainEntrance()
+    elif args == 2:
+        mainEntrance(sys.argv[1])
