@@ -15,6 +15,8 @@ from bs4 import BeautifulSoup
 websiteBase = "http://wiki.52poke.com"
 # 全局sqlite连接
 sqliteConn = ObjSqliteConnector("./52Poke.db3")
+# 招式解析错误提示文件
+movementErrorFile = open('./movementError', 'wb')
 
 
 # 右上角宝可梦信息卡片，包含宝可梦名称，图片，属性，分类，特性，全国图鉴编号，地区图鉴编号
@@ -278,55 +280,50 @@ class SinglePokemonPage:
             #     print k, v
 
     def parseTrTagByMovementType(self, trTag, movementType):
-        i = 0
         retList = []
         # 每个招式的详情
+        i = 0
         for tdTag in trTag.select("td[class!='hide']"):
-            content = tdTag.text.encode('utf8').strip()
-            if movementType == '可学会的招式' and i == 1:
-                content = content.replace('[详]', '')
-            retList.append(content)
             i = i + 1
+            content = tdTag.text.encode('utf8').strip()
+            if (movementType == '能使用的招式学习器' or movementType == '能使用的招式學習器') and i == 1: continue
+            if movementType == '蛋招式' and i == 1:
+                content = ''
+                for aTag in tdTag.findChildren('a'):
+                    if aTag.has_attr('title'):
+                        content = content + aTag['title'].encode('utf8').strip() + '|'
+                content = content.strip('|')
+            retList.append(content.replace('[详]', ''))
         return retList
 
-    def getTargetMovements(self, parseTag, multi):
-        bBreak = False
-        alreadyCheck = False
-        targetName = '《太阳／月亮／究极之日／究极之月》'
-        if multi: targetName = parseTag.text.encode('utf8').strip()
-        print 'targetName:' + targetName
-        while True:
-            movementType = parseTag.text.encode('utf8').strip()
-            if multi and alreadyCheck == False and parseTag.name == 'h4':
-                parseTag = parseTag.find_next_sibling()
-                movementType = parseTag.text.encode('utf8').strip()
-                alreadyCheck = True
-            print 'movementType:' + movementType
-            if movementType not in movementsTitleList:
-                print "----" + movementType
-                break
-            # print parseTag.name, movementType
-            parseTag = parseTag.find_next_sibling()
-            if parseTag.name != 'table':
-                print '{} 解析失败'.format(self.pokemonName)
-                bBreak = True
-                break
-            # 获取相应招式列表
-            trTagList = parseTag.tbody.select('tr.bgwhite.at-c')
-            movementList = []
-            for trTag in trTagList:
-                movementList.append(self.parseTrTagByMovementType(trTag, movementType))
-            self.dMovements[movementType] = movementList
-            parseTag = parseTag.find_next_sibling()
-            # print json.dumps(self.dMovements, ensure_ascii=False).decode('string_escape')
-        return parseTag, bBreak
+    def getTargetMovements(self, titleId, movementTypeId):
+        if movementTypeId == '':
+            print '无获取招式的类型，可能出现错误！'
+            return '', '', None
+        parseTag = self.soup.find(id=movementTypeId).parent
+        movementType = parseTag.text.encode('utf8').strip()
+        titleName = movementType
+        if titleId != '':
+            titleName = self.soup.find(id=titleId).parent.text.encode('utf8').strip()
+        # print titleName, movementType
+        # 获取招式列表框
+        parseTag = parseTag.find_next_sibling()
+        if parseTag.name != 'table':
+            print '{}==>{} 解析失败'.format(titleName, movementType)
+            return titleName, movementType, None
+        trTagList = parseTag.tbody.select('tr.bgwhite.at-c')
+        movementList = []
+        for trTag in trTagList:
+            movementList.append(self.parseTrTagByMovementType(trTag, movementType))
+        return titleName, movementType, movementList
 
     # 获取宝可梦的招式列表
     def getPokemonMovements(self):
         self.dMovements.clear()
         # 获取招式的链接ID
         bFind = False
-        targetLiTagIdList = []
+        ulTag = None
+        newUlTag = None
         menuLiTagList = self.soup.select('div.toc#toc > ul > li > ul > li.toclevel-2')
         for liTag in menuLiTagList:
             for tag in liTag.children:
@@ -334,11 +331,47 @@ class SinglePokemonPage:
                     aTagText = tag.text.encode('utf8').split(' ')[-1].strip()
                     if aTagText == '可学会招式表' or aTagText == '可學會招式錶':
                         bFind = True
-                if tag.name == '':
-
+                if tag.name == 'ul':
+                    ulTag = tag
             if bFind: break
-
-
+        if not bFind and ulTag == None:
+            print "未查找到可学会招式表！"
+            return
+        for tag in ulTag.children:
+            titleId = ''
+            titleName = ''
+            movementTypeId = ''
+            bHasChild = False
+            dMovementsTemp = {}
+            if tag.name != 'li':
+                continue
+            for newTag in tag.children:
+                if newTag.name == None: continue
+                if newTag.name == 'a':
+                    if newTag.has_attr('href'): titleId = newTag['href'].encode('utf8').strip().strip('#')
+                if newTag.name == 'ul':
+                    bHasChild = True
+                    newUlTag = newTag
+            if bHasChild:
+                for childTag in newUlTag.children:
+                    if childTag.name != 'li': continue
+                    aTag = childTag.findChild('a')
+                    if aTag:
+                        if aTag.has_attr('href'): movementTypeId = aTag['href'].encode('utf8').strip().strip('#')
+                        titleName, movementType, movementList = self.getTargetMovements(titleId, movementTypeId)
+                        if movementList == None:
+                            movementErrorFile.write('{}\n'.format(self.pokemonName))
+                        else:
+                            dMovementsTemp[movementType] = movementList
+            else:
+                titleName, movementType, movementList = self.getTargetMovements('', titleId)
+                if movementList == None:
+                    movementErrorFile.write('{}\n'.format(self.pokemonName))
+                else:
+                    dMovementsTemp[movementType] = movementList
+                dMovementsTemp[movementType] = movementList
+            self.dMovements[titleName] = dMovementsTemp
+        # print json.dumps(self.dMovements, ensure_ascii=False).decode('string_escape')
         # if targetId == '':
         #     print '{} 未检测到可学会招式表'.format(self.pokemonName)
         #     return
@@ -355,13 +388,18 @@ class SinglePokemonPage:
 
 
     def doDatabaseInsert(self):
-        insertList = []
-        for k, v in self.dSpeciesStrength.iteritems():
-            totalValue = int(v['HP']) + int(v['攻击']) + int(v['防御']) + int(v['特攻']) + int(v['特防']) + int(v['速度'])
-            pokemonSpeciesStrengthTuple = (
-                self.nationalSn, self.pokemonName, k, v['HP'], v['攻击'], v['防御'], v['特攻'], v['特防'], v['速度'], totalValue)
-            insertList.append(pokemonSpeciesStrengthTuple)
-        print sqliteConn.insert('PokemonSpeciesStrength', insertList)
+        # 插入宝可梦种族值--暂时不需要了，种族值进行了截图了
+        # insertList = []
+        # for k, v in self.dSpeciesStrength.iteritems():
+        #     totalValue = int(v['HP']) + int(v['攻击']) + int(v['防御']) + int(v['特攻']) + int(v['特防']) + int(v['速度'])
+        #     pokemonSpeciesStrengthTuple = (
+        #         self.nationalSn, self.pokemonName, k, v['HP'], v['攻击'], v['防御'], v['特攻'], v['特防'], v['速度'], totalValue)
+        #     insertList.append(pokemonSpeciesStrengthTuple)
+        # print sqliteConn.insert('PokemonSpeciesStrength', insertList)
+        # 插入宝可梦的招式列表
+        pokemonMovementsTuple = (self.nationalSn, self.pokemonName, json.dumps(self.dMovements, ensure_ascii=False))
+        print sqliteConn.insert('PokemonMovementsGain', [pokemonMovementsTuple, ], '(Sn, Name, MovementsJson)')
+
 
     def run(self):
         # 获取宝可梦名字
@@ -392,8 +430,8 @@ class SinglePokemonPage:
         print self.nationalSn, self.pokemonName
         # 获取宝可梦种族值
         self.getSpeciesStrength()
-        # self.doDatabaseInsert()
         self.getPokemonMovements()
+        self.doDatabaseInsert()
 
 
 def ClearAllDataFromDatabase():
@@ -450,3 +488,5 @@ if __name__ == '__main__':
         mainEntrance()
     elif args == 2:
         mainEntrance(sys.argv[1])
+
+    movementErrorFile.close()
