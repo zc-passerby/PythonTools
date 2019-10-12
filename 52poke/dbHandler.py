@@ -29,7 +29,7 @@ class ObjSqliteConnector(object):
         try:
             if not self.conFlag:
                 self._Connect()
-            print sql
+            # print sql
             self.dbCursor.execute(sql)
             self.dbConn.commit()
             return (True, 'successful')
@@ -40,7 +40,7 @@ class ObjSqliteConnector(object):
         try:
             if not self.conFlag:
                 self._Connect()
-            print sql, params
+            # print sql, params
             self.dbCursor.execute(sql, params)
             self.dbConn.commit()
             return (True, 'successful')
@@ -51,7 +51,7 @@ class ObjSqliteConnector(object):
         try:
             if not self.conFlag:
                 self._Connect()
-            print sql, params
+            # print sql, params
             self.dbCursor.executemany(sql, params)
             self.dbConn.commit()
             return (True, 'successful')
@@ -62,7 +62,7 @@ class ObjSqliteConnector(object):
         try:
             if not self.conFlag:
                 self._Connect()
-            print sql
+            # print sql
             self.dbCursor.execute(sql)
             retList = self.dbCursor.fetchall()
             if len(retList) <= 0 and type(retList) != list:
@@ -75,7 +75,7 @@ class ObjSqliteConnector(object):
         try:
             if not self.conFlag:
                 self._Connect()
-            print sql, params
+            # print sql, params
             self.dbCursor.execute(sql, params)
             retList = self.dbCursor.fetchall()
             if len(retList) <= 0 and type(retList) != list:
@@ -100,11 +100,11 @@ class ObjSqliteConnector(object):
                 bRet, Result = False, 'values is not fit for [(),]'
                 return
             valuesLen = len(values)
-            colunmLen = len(values[0])
-            if colunmLen <= 0 or valuesLen <= 0:
+            columnLen = len(values[0])
+            if columnLen <= 0 or valuesLen <= 0:
                 bRet, Result = False, 'there has not data to insert'
                 return
-            insertSqlFormat = 'INSERT INTO `{0}` {1} values (?' + ',?' * (colunmLen - 1) + ');'
+            insertSqlFormat = 'INSERT INTO `{0}` {1} values (?' + ',?' * (columnLen - 1) + ');'
             insertSql = insertSqlFormat.format(tableName, columns)
             if valuesLen == 1:
                 bRet, Result = self._executeSqlFormat(insertSql, values[0])
@@ -218,8 +218,9 @@ def PokeDexBuild(sqliteConn):
 
 def PokemonMovementsGainBuild(sqliteConn):
     print sqliteConn.createTable('PokemonMovementsGain', (
-    '"Sn" TEXT NOT NULL', '"Name" TEXT NOT NULL', '"MovementsJson" TEXT NOT NULL', '"Gen1Json" TEXT', '"Gen2Json" TEXT',
-    '"Gen3Json" TEXT', '"Gen4Json" TEXT', '"Gen5Json" TEXT', '"Gen6Json" TEXT', '"Gen7Json" TEXT', '"Gen8Json" TEXT'))
+        '"Sn" TEXT NOT NULL', '"Name" TEXT NOT NULL', '"MovementsJson" TEXT NOT NULL', '"Gen1Json" TEXT',
+        '"Gen2Json" TEXT', '"Gen3Json" TEXT', '"Gen4Json" TEXT', '"Gen5Json" TEXT', '"Gen6Json" TEXT',
+        '"Gen7Json" TEXT', '"Gen8Json" TEXT', 'PRIMARY KEY ("Sn")'))
 
 
 if __name__ == '__main__':
