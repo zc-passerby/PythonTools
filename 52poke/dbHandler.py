@@ -205,22 +205,42 @@ class ObjSqliteConnector(object):
             return (bRet, Result)
 
 
+def PokeDexBuild(sqliteConn):
+    print sqliteConn.createTable('PokeDex', (
+        '"Sn" TEXT NOT NULL ON CONFLICT IGNORE DEFAULT ""', '"NameZh" TEXT NOT NULL DEFAULT ""',
+        '"NameJp" TEXT NOT NULL DEFAULT ""', '"NameEn" TEXT NOT NULL DEFAULT ""', 'PRIMARY KEY ("Sn")'))
+    bRet, result = sqliteConn.select('PokemonBaseInfo', 'Sn, NameZh, NameJp, NameEn')
+    for tInfo in result:
+        Sn, NameZh, NameJp, NameEn = tInfo
+        NameZh = NameZh.split('【')[0]
+        print sqliteConn.insert('PokeDex', [(Sn, NameZh, NameJp, NameEn), ])
+
+
+def PokemonMovementsGainBuild(sqliteConn):
+    print sqliteConn.createTable('PokemonMovementsGain', (
+    '"Sn" TEXT NOT NULL', '"Name" TEXT NOT NULL', '"MovementsJson" TEXT NOT NULL', '"Gen1Json" TEXT', '"Gen2Json" TEXT',
+    '"Gen3Json" TEXT', '"Gen4Json" TEXT', '"Gen5Json" TEXT', '"Gen6Json" TEXT', '"Gen7Json" TEXT', '"Gen8Json" TEXT'))
+
+
 if __name__ == '__main__':
-    sqliteConn = ObjSqliteConnector("./test.sqlite")
-    print sqliteConn.createTable('abc',
-                                 ['id integer primary key autoincrement', 'name varchar(128), info varchar(128)'])
-    print sqliteConn.insert('abc', [(1, 'a', 'a'), (2, 'b', 'b'), (3, 'c', 'c')])
-    print sqliteConn.insert('abc', [(4, 'd'), (5, 'e')], '(id, name)')
-    print sqliteConn.insert('abc', [(4, 'd'), (5, 'e')], '(id, name)')
-    print sqliteConn.insert('abc', [(6, 'f'), (7, 'g')], '(id, info)')
-    print sqliteConn.insert('abc', [(8, 'h')], '(id, name)')
-    print sqliteConn.insert('abc', [(9, 'i', 'i')])
-    print sqliteConn.select('abc')
-    print sqliteConn.select('abc', '(id)', 'id=?', (5,))
-    print sqliteConn.selectAndGetId('abc', ('info'), 'id=?', (5,))
-    print sqliteConn.update('abc', 'dfd', 'dfd')
-    print sqliteConn.update('abc', ('name', 'info'), ('test', 'test'))
-    print sqliteConn.update('abc', ('id', 'name'), (100, 'hahaha'), 'id=?', (1,))
-    print sqliteConn.delete('abc')
-    print sqliteConn.delete('abc', 'id=?', (5,))
+    sqliteConn = ObjSqliteConnector("./52Poke.db3")
+    # print sqliteConn.createTable('abc',
+    #                              ['id integer primary key autoincrement', 'name varchar(128), info varchar(128)'])
+    # print sqliteConn.insert('abc', [(1, 'a', 'a'), (2, 'b', 'b'), (3, 'c', 'c')])
+    # print sqliteConn.insert('abc', [(4, 'd'), (5, 'e')], '(id, name)')
+    # print sqliteConn.insert('abc', [(4, 'd'), (5, 'e')], '(id, name)')
+    # print sqliteConn.insert('abc', [(6, 'f'), (7, 'g')], '(id, info)')
+    # print sqliteConn.insert('abc', [(8, 'h')], '(id, name)')
+    # print sqliteConn.insert('abc', [(9, 'i', 'i')])
+    # print sqliteConn.select('abc')
+    # print sqliteConn.select('abc', '(id)', 'id=?', (5,))
+    # print sqliteConn.selectAndGetId('abc', ('info'), 'id=?', (5,))
+    # print sqliteConn.update('abc', 'dfd', 'dfd')
+    # print sqliteConn.update('abc', ('name', 'info'), ('test', 'test'))
+    # print sqliteConn.update('abc', ('id', 'name'), (100, 'hahaha'), 'id=?', (1,))
+    # print sqliteConn.delete('abc')
+    # print sqliteConn.delete('abc', 'id=?', (5,))
     # sqliteConn.dropTable('abc')
+    # ----------
+    PokeDexBuild(sqliteConn)
+    PokemonMovementsGainBuild(sqliteConn)
