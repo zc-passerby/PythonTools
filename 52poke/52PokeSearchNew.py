@@ -429,9 +429,9 @@ class SinglePokemonPage:
 
         print self.nationalSn, self.pokemonName
         # 获取宝可梦种族值
-        self.getSpeciesStrength()
-        self.getPokemonMovements()
-        self.doDatabaseInsert()
+        # self.getSpeciesStrength()
+        # self.getPokemonMovements()
+        # self.doDatabaseInsert()
 
 
 def ClearAllDataFromDatabase():

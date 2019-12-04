@@ -206,6 +206,7 @@ class ObjSqliteConnector(object):
 
 
 def PokeDexBuild(sqliteConn):
+    print sqliteConn.dropTable('PokeDex')
     print sqliteConn.createTable('PokeDex', (
         '"Sn" TEXT NOT NULL ON CONFLICT IGNORE DEFAULT ""', '"NameZh" TEXT NOT NULL DEFAULT ""',
         '"NameJp" TEXT NOT NULL DEFAULT ""', '"NameEn" TEXT NOT NULL DEFAULT ""', 'PRIMARY KEY ("Sn")'))
@@ -217,6 +218,7 @@ def PokeDexBuild(sqliteConn):
 
 
 def PokemonMovementsGainBuild(sqliteConn):
+    print sqliteConn.dropTable('PokemonMovementsGain')
     print sqliteConn.createTable('PokemonMovementsGain', (
         '"Sn" TEXT NOT NULL', '"Name" TEXT NOT NULL', '"MovementsJson" TEXT NOT NULL', '"Gen1Json" TEXT',
         '"Gen2Json" TEXT', '"Gen3Json" TEXT', '"Gen4Json" TEXT', '"Gen5Json" TEXT', '"Gen6Json" TEXT',
@@ -245,3 +247,4 @@ if __name__ == '__main__':
     # ----------
     PokeDexBuild(sqliteConn)
     PokemonMovementsGainBuild(sqliteConn)
+    sqliteConn._executeSql('VACUUM') # 释放空间

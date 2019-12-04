@@ -80,6 +80,7 @@ def getCropImage(**kwargs):
     imageFileName = kwargs['imageFileName']
     cssSelector = kwargs['cssSelector']
     position = kwargs.get('position', 0)
+    tryRepair = kwargs.get('tryRepair', 0)
     # repair = kwargs.get('repair', False)
     try:
         targetElement = cropElement.find_elements_by_css_selector(cssSelector)[position]
@@ -103,10 +104,12 @@ def getCropImage(**kwargs):
         #                     cropPosition[2] - widthOffset, cropPosition[3] - heightOffset)
         # print '{}偏移: ({}, {})'.format(cropLink.text.encode('utf8').split(' ')[-1].strip(), widthOffset,
         #                               heightOffset)
+        if tryRepair:
+            tryRepair = (width - 750) / 2
         # 进行截图和图片处理
         browser.get_screenshot_as_file(imageFileName)
         im = Image.open(imageFileName)
-        im = im.crop((cropPosition[0], cropPosition[1], cropPosition[2] + width, cropPosition[3] + height))
+        im = im.crop((cropPosition[0] - tryRepair, cropPosition[1], cropPosition[2] + width -tryRepair, cropPosition[3] + height))
         im.save(imageFileName)
         # 图片压缩，仅针对linux
         if platform.system() == 'Linux':
@@ -135,14 +138,14 @@ def getPokemonSpeciesStrength(browser, pokemonName, speciesStrengthLink):
         }
         if len(tabElementList) == 0:
             dParams['cropPosition'] = (199, 16, 210, 28)
-            dParams['imageFileName'] = 'images/speciesStrength1/{}.png'.format(pokemonName)
+            dParams['imageFileName'] = 'images/speciesStrength/{}.png'.format(pokemonName)
             getCropImage(**dParams)
         else:
             for pos, tabElement in enumerate(tabElementList):
                 tabElement.click()
                 dParams['position'] = pos
                 dParams['cropPosition'] = (205, 60, 216, 72)
-                dParams['imageFileName'] = 'images/speciesStrength1/{}_{}.png'.format(pokemonName,
+                dParams['imageFileName'] = 'images/speciesStrength/{}_{}.png'.format(pokemonName,
                                                                                       tabElement.text.encode('utf8'))
                 getCropImage(**dParams)
     except:
@@ -167,7 +170,9 @@ def getPokemonTypeOpposite(browser, pokemonName, TypeOppositeLink):
         for pos, tabElement in enumerate(tabElementList):
             tabElement.click()
             dParams['position'] = pos
-            dParams['cropPosition'] = (245, 63, 66, 125)
+            dParams['tryRepair'] = 1
+            # dParams['cropPosition'] = (245, 63, 66, 125)
+            dParams['cropPosition'] = (392, 64, 401, 73) # 剑盾
             dParams['imageFileName'] = 'images/typeOpposite/{}_{}.png'.format(pokemonName,
                                                                               tabElement.text.encode('utf8'))
             getCropImage(**dParams)
@@ -208,12 +213,12 @@ def parsePokemon(browser, quoteName, bSingle):
             elif aTagText == '属性相性' or aTagText == '屬性相性':
                 TypeOppositeLink = aTag
 
-        # if evolveLink: print evolveLink.get_attribute('href').split('#')[-1]
-        # if megaEvolveLink: print megaEvolveLink.get_attribute('href').split('#')[-1]
-        # if transformEvolveLink: print transformEvolveLink.get_attribute('href').split('#')[-1]
-        # getPokemonEvolve(browser, pokemonName, evolveLink, megaEvolveLink, transformEvolveLink)
+        if evolveLink: print evolveLink.get_attribute('href').split('#')[-1]
+        if megaEvolveLink: print megaEvolveLink.get_attribute('href').split('#')[-1]
+        if transformEvolveLink: print transformEvolveLink.get_attribute('href').split('#')[-1]
+        getPokemonEvolve(browser, pokemonName, evolveLink, megaEvolveLink, transformEvolveLink)
         getPokemonSpeciesStrength(browser, pokemonName, speciesStrengthLink)
-        # getPokemonTypeOpposite(browser, pokemonName, TypeOppositeLink)
+        getPokemonTypeOpposite(browser, pokemonName, TypeOppositeLink)
         # 若仅解析单个宝可梦，则不需要进入下个宝可梦页面
         if bSingle: break
         # 点击解析下一个宝可梦
