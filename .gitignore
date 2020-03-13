@@ -102,3 +102,5 @@ ENV/
 
 # PyCharm project directory
 .idea
+
+wechatGroupQrcode.db3

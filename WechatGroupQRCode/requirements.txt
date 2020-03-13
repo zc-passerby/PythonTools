@@ -1,7 +1,8 @@
-requests>=2.22.0
-Pillow>=5.4.1
-lxml>=3.2.1
-bs4>=0.0.1
-beautifulsoup4>=4.7.1
-pyzbar>=0.1.8
-zbar>=0.10
+requests==2.23.0
+Pillow==6.2.2
+lxml==3.2.1
+soupsieve==1.9.5
+bs4==0.0.1
+beautifulsoup4==4.8.2
+pyzbar==0.1.8
+#zbar>=0.10

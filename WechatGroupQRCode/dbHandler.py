@@ -266,6 +266,28 @@ def SyncSqliteToMysql(sqliteConn):
         print traceback.format_exc()
 
 
+def connectMysql():
+    # 打开数据库连接
+    return MySQLdb.connect("127.0.0.1", "root", "yt6533629@100", "u_crm_db_dev", charset='utf8')
+
+def closeMysql(dbConn):
+    # 关闭数据库连接
+    dbConn.close()
+
+def InsertToMysqlDb(dbConn, data):
+    insert_sql = "insert into `wechat_group_qrcode` (`qrcode_url`, `qrcode_filename`, `create_time`) values " + str(data) + ";"
+    try:
+        # 使用cursor()方法获取操作游标
+        cursor = dbConn.cursor()
+        # 执行sql语句
+        cursor.execute(insert_sql)
+        # 提交到数据库执行
+        dbConn.commit()
+    except:
+        # Rollback in case there is any error
+        dbConn.rollback()
+    cursor.close()
+
 if __name__ == '__main__':
     pass
     # sqliteConn = ObjSqliteConnector("./52Poke.db3")
