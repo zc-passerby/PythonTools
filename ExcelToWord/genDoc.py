@@ -16,13 +16,37 @@ source_file_name = getCurrentPwd() + '/数据表格.xlsx'
 template_file_path = getCurrentPwd() + '/模板'
 output_file_path = getCurrentPwd() + '/导出'
 
+
 class DocxHandler():
     def __init__(self, filename, d_replace):
         self.document = Document(filename)
         self.d_replace = d_replace
 
+    def replaceContent(self, content):
+        old_content = content
+        for k, v in self.d_replace.items():
+            content = content.replace(k, v)
+        return (old_content == content), content
+
+    def replaceParagraphRuns(self, paragraph):
+        if 0 == len(paragraph.runs): return
+        run_text = ''
+        for run in paragraph.runs:
+            is_same, content = self.replaceContent(run.text)
+            if not is_same: run.text = content
+            run_text += run.text
+        is_same, content = self.replaceContent(run_text)
+        if not is_same:
+            for i, run in enumerate(paragraph.runs):
+                if i == 0:
+                    run.text = content
+                else:
+                    run.text = ''
+
     def replaceParagraphText(self):
-        pass
+        for paragraph in self.document.paragraphs:
+            print("---------替换段落内容---------")
+            self.replaceParagraphRuns(paragraph)
 
     def replaceTableText(self):
         for table in self.document.tables:
@@ -31,14 +55,15 @@ class DocxHandler():
                 for cell in row.cells:
                     if len(cell.paragraphs):
                         for paragraph in cell.paragraphs:
-                            if len(paragraph.runs):
-                                run_text = ''
-                                for run in paragraph.runs:
-                                    run_text += run.text
-
+                            self.replaceParagraphRuns(paragraph)
 
     def replaceText(self):
         self.replaceTableText()
+        self.replaceParagraphText()
+
+    def save(self, filename=''):
+        if filename:
+            self.document.save(filename)
 
 
 def doHandleDoc(wordApp, template_filename, output_filename, d_params):
@@ -54,7 +79,8 @@ def readSourceData():
     sheet0 = xls_fd.sheet_by_index(0)
     row_count = sheet0.nrows
     for row in range(1, row_count):
-        param = str(sheet0.cell(row, 1).value).strip()
+        param = '${' + str(sheet0.cell(row, 1).value).strip() + '}'
+        # param = str(sheet0.cell(row, 1).value).strip()
         value = str(sheet0.cell(row, 2).value).strip()
         d_params[param] = value
     return d_params
@@ -73,8 +99,11 @@ def entrance():
         if file_name.startswith('~$'): continue
         template_filename = template_file_path + '/' + file_name
         output_filename = output_file_path + '/' + file_name
+        print('处理文件：', template_filename)
         doc = DocxHandler(template_filename, d_params)
         doc.replaceText()
+        doc.save(output_filename)
+        print('文件处理完成：', output_filename)
         # doHandleDoc(wordApp, template_filename, output_filename, d_params)
     # del wordApp
 
@@ -91,8 +120,11 @@ if __name__ == '__main__':
             if not os.path.exists(file_name):
                 print("数据文件不存在【%s】", file_name)
     if file_name: source_file_name = file_name
+    if not os.path.exists(output_file_path): os.mkdir(output_file_path)
 
     try:
         entrance()
     except:
         print(traceback.format_exc())
+
+    input()
