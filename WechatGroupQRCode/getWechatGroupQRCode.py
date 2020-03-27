@@ -36,7 +36,8 @@ urllib3.disable_warnings()
 # 全局sqlite连接
 # sqliteConn = dbHandler.ObjSqliteConnector("./wechatGroupQrcode.db3")
 # 全局Mysql连接
-mysqlConn = dbHandler.connectMysql()
+# mysqlConn = dbHandler.connectMysql()
+# mysqlConn = None
 # 时间格式匹配
 str_time_pattern = re.compile('(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})')
 
@@ -100,6 +101,7 @@ class ParseWebsite(ScheduleBase):
     '''
 
     def __init__(self):
+        self.mysqlConn = None
         self.encoding = 'utf8'
         self.website_name = ''
         self.home_url = ''
@@ -146,7 +148,7 @@ class ParseWebsite(ScheduleBase):
             # 将数据写入数据库
             for qrcode_url in qrcode_url_list:
                 # dbHandler.InsertWechatQrcodeInfo(sqliteConn, qrcode_url, image_filename, self.website_name, create_time)
-                dbHandler.InsertToMysqlDb(mysqlConn, (str(qrcode_url), str(image_filename), str(create_time)))
+                dbHandler.InsertToMysqlDb(self.mysqlConn, (str(qrcode_url), str(image_filename), str(create_time)))
         except Exception:
             print 'some error occurs: %s' % traceback.format_exc()
             return False
@@ -224,8 +226,9 @@ class ParseWebsite(ScheduleBase):
 
 
 class ParseWxqun(ParseWebsite):
-    def __init__(self):
+    def __init__(self, mysqlConn):
         ParseWebsite.__init__(self)
+        self.mysqlConn = mysqlConn
         self.encoding = 'utf8'
         self.website_name = "wxqun"
         self.home_url = "www.wxqun.com"
@@ -242,8 +245,9 @@ class ParseWxqun(ParseWebsite):
 
 
 class ParseChinaRot(ParseWebsite):
-    def __init__(self):
+    def __init__(self, mysqlConn):
         ParseWebsite.__init__(self)
+        self.mysqlConn = mysqlConn
         self.encoding = 'utf8'
         self.website_name = "chinarot"
         self.home_url = "www.chinarot.com"
@@ -260,8 +264,9 @@ class ParseChinaRot(ParseWebsite):
 
 
 class ParseQunFenXiang(ParseWebsite):
-    def __init__(self):
+    def __init__(self, mysqlConn):
         ParseWebsite.__init__(self)
+        self.mysqlConn = mysqlConn
         self.encoding = 'utf8'
         self.website_name = "qunfenxiang"
         self.home_url = "www.qunfenxiang.net"
@@ -278,8 +283,9 @@ class ParseQunFenXiang(ParseWebsite):
 
 
 class ParseWeixinqun(ParseWebsite):
-    def __init__(self):
+    def __init__(self, mysqlConn):
         ParseWebsite.__init__(self)
+        self.mysqlConn = mysqlConn
         self.encoding = 'utf8'
         self.website_name = "weixinqun"
         self.home_url = "weixinqun.com"
@@ -295,30 +301,35 @@ class ParseWeixinqun(ParseWebsite):
         self.next_page_selector = '.pageNo.vm.center > a'
 
 
-def mainEntrance():
+def mainEntrance(mysqlConn):
     # 先创建数据表
     # dbHandler.WechatQrcodeInfoBuild(sqliteConn)
-    wxqun_parser = ParseWxqun()
+    wxqun_parser = ParseWxqun(mysqlConn)
     wxqun_parser.run()
     # dbHandler.SyncSqliteToMysql(sqliteConn)
-    chinarot_parser = ParseChinaRot()
+    chinarot_parser = ParseChinaRot(mysqlConn)
     chinarot_parser.run()
-    qunfenxiang_parser = ParseQunFenXiang()
+    qunfenxiang_parser = ParseQunFenXiang(mysqlConn)
     qunfenxiang_parser.run()
     # weixinqun_parser = ParseWeixinqun()
     # weixinqun_parser.run()
-    dbHandler.closeMysql(mysqlConn)
+    # dbHandler.closeMysql(mysqlConn)
 
 
 if __name__ == '__main__':
     reload(sys)
     sys.setdefaultencoding('utf8')
+    # 创建存放文件的路径
     try:
-        # 创建存放文件的路径
         print os.makedirs(image_path)
         print os.popen('chown -R nginx:nginx ' + image_path).read()
-    except Exception:
+    except:
         pass
     while True:
-        mainEntrance()
+        try:
+            mysqlConn = dbHandler.connectMysql()
+            mainEntrance(mysqlConn)
+            dbHandler.closeMysql(mysqlConn)
+        except Exception:
+            pass
         time.sleep(delay_seconds)
