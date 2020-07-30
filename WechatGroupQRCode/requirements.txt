@@ -1,5 +1,6 @@
 requests==2.23.0
-Pillow==6.2.2
+#Pillow==6.2.2
+Pillow>=7.1.0
 lxml==3.2.1
 soupsieve==1.9.5
 bs4==0.0.1
