@@ -1,4 +1,4 @@
-requests==2.23.0
+requests==2.31.0
 #Pillow==6.2.2
 Pillow>=7.1.0
 lxml==3.2.1
